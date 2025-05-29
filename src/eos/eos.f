@@ -783,6 +783,7 @@ C
         IF(niter.ge.MAXITER) THEN
           WRITE(*,*) 'T,Pg,Pgas,Pelec,Pe_in,Pe_out,NITER=',
      *                Temp,Pg,Pgas,Pe,Pe_old,Pelec,niter,FAILED
+          write(*,*) splist(138),xnpf(138),xtotal
           IF(niter.gt.MAXITER*20) STOP
         END IF
 C
@@ -1196,12 +1197,12 @@ c        write(*,'(10f8.3)') log10(abund)
      *             awt,iter,FAILED)
         endif
         niter=niter+iter
-        IF(niter.ge.MAXITER) THEN
-          Pelec=xne*Tk
+c        IF(niter.ge.MAXITER) THEN
+c          Pelec=xne*Tk
 c          WRITE(*,*) 'T,Pgas,Pnew,Pelec,Pe_in,Pe_out,NITER=',
 c     *                Temp,Pgas,Pg,Pe,Pe_old,Pelec,niter,FAILED
-          IF(niter.gt.MAXITER*20) STOP
-        END IF
+c          IF(niter.gt.MAXITER*20) STOP
+c        END IF
 C
 C Adjust pressure according to the discrepancy in density 
 C
@@ -1913,7 +1914,7 @@ C
 c
 c  If ionization potential is not available use the one for TiO!
 c
-          POTION(ISPEC)=6.4
+          POTION(ISPEC)=POTI(1)
         ENDIF
       ELSE
 C
@@ -2187,7 +2188,9 @@ C  Now get the molecular constants from MOLCON.
 C
         CALL MOLCON(SPLIST(ISPEC),TEMP,NTOT(ISPEC),RATIOM,QPRD,
      &              KT(ISPEC),PART(ISPEC),PION,BARKLEM)
-c       if(SPLIST(ISPEC).eq.'TiO')write(*,*) TEMP,KT(ISPEC),PART(ISPEC)
+c       if(SPLIST(ISPEC).eq.'H2'.or.SPLIST(ISPEC).eq.'TiO') then
+c         write(*,*) SPLIST(ISPEC),TEMP,KT(ISPEC),PART(ISPEC),RATIOM,QPRD
+c       endif
 cC!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 c        do ittt=0,100
 c          ttt(ittt+1)=20.*ittt+1000.
@@ -2258,8 +2261,10 @@ C
           ELSE
             IT(ISPEC)=1.D0
           ENDIF
-          IT(ISPEC)=1.D0
+c          IT(ISPEC)=1.D0
+C          write(*,*) SPLIST(ISPEC),IT(ISPEC),KT(ISPEC)
         END IF
+c        write(*,*) SPLIST(ISPEC),POTION(ISPEC),PION,POTI(1)
 C
 C  Store ionization potential (needed e.g. for broadening calculations)
 C
@@ -2269,7 +2274,7 @@ C
 c
 c  If ionization potential is not available use the one for TiO!
 c
-          POTION(ISPEC)=6.4
+          POTION(ISPEC)=POTI(1)
         ENDIF
       ELSE
 C
@@ -3105,7 +3110,7 @@ C
           ELSE
             IT(ISPEC)=1.D0
           ENDIF
-          IT(ISPEC)=1.D0
+c          IT(ISPEC)=1.D0
         END IF
 C
 C  Store ionization potential (needed e.g. for broadening calculations)
@@ -3116,7 +3121,7 @@ C
 c
 c  If ionization potential is not available use the one for TiO!
 c
-          POTION(ISPEC)=6.4
+          POTION(ISPEC)=POTI(1)
         ENDIF
       ELSE
 C
@@ -4845,24 +4850,13 @@ C
 C
 C Calculate independent variable for polynomial expansions.
 C Note that the polynomial expansions in Sauval & Tatum (1984) and Irwin
-C (1987,1988) are in terms of log10(5040/T), not log10(5039.7475/T), but
-C the more accurate value of 5039.7475 should be used in converting the
-C partition function into an equilibrium constant.
+C (1987,1988) are in terms of log10(5040/T), not log10(5039.7475/T), 
+C even though log10(exp(-D/kT)) = -D/kT/log(10) = -D * log(10)/k / T =
+C = -D * 5039.7475/T = -D * Theta.
 C
    2  TLIM=MAX(1250.,T)
       TH=5040.D0/TLIM
       LOGTH=LOG10(TH)
-C
-C Check if there is relevant data in Paul Barklem's tables
-C
-      CALL KP_Q_SPLN(SPNAME,T,Qm_spln,Kp_spln,D0,BARKLEM)
-      IF(BARKLEM) THEN
-c        EQK =Kp_spln-COEF(1,J)*5039.7475D0/TLIM
-        EQK =Kp_spln-COEF(1,J)*5040.D0/T
-        EQK =10.D0**EQK
-        PART=10.D0**Qm_spln
-        COEF(1,J)=D0
-      ENDIF
 C
 C Construct equilibrium constant from polynomial coefficients and
 C dissociation constant. A "+1" term at the end would convert from
@@ -4919,12 +4913,27 @@ C Convert equilibrium constant and partition function from logarithms.
 C
 c      EQK_ST=10.D0**EQK_ST
       PART=10.D0**PART
-      if(spname.eq.'H3O+') then
-        EQK_ST=(NTOT-1)*(79.733501D0+2.5D0*(LOG10(T)-15.859914D0))+
-c     &         1.5D0*RATIOM+QPRD-PART-COEF(1,J)*5039.7475D0/T
-     &         1.5D0*RATIOM+QPRD-PART-COEF(1,J)*5040.D0/T
-        EQK=10.D0**EQK_ST
-      endif
+C
+C Check if there is relevant data in Paul Barklem's tables
+C
+      CALL KP_Q_SPLN(SPNAME,T,Qm_spln,Kp_spln,D0,BARKLEM)
+      IF(BARKLEM) THEN
+c         if(abs(D0-COEF(1,J))/(D0+COEF(1,J)).GT.0.05) THEN
+c           write(*,*) 'EOS: ',J,SPNAME,D0,COEF(1,J)
+c         endif
+c        D0=COEF(1,J)
+c        EQK =Kp_spln-D0*5039.7475D0/TLIM
+        EQK =Kp_spln-D0*5040.D0/T
+        EQK =10.D0**EQK
+        PART=10.D0**Qm_spln
+      ENDIF
+
+c      if(spname.eq.'H3O+') then
+c        EQK_ST=(NTOT-1)*(79.733501D0+2.5D0*(LOG10(T)-15.859914D0))+
+cc     &         1.5D0*RATIOM+QPRD-PART-COEF(1,J)*5039.7475D0/T
+c     &         1.5D0*RATIOM+QPRD-PART-COEF(1,J)*5040.D0/T
+c        EQK=10.D0**EQK_ST
+c      endif
 c      write(*,'(''cMOLCON:'',F10.1,A9,5G13.6)') T,SPNAME,EQK,
 c     &                             PART,BARKLEM
 c      if(spname.eq.'NO') write(*,'(a,f10.2,1p3e16.8)')
