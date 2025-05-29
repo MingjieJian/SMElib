@@ -7539,6 +7539,7 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
     OPC_C=XK[NRHOX-2];
     DBNU=2.0*(SRC_B-SRC_C)/((RHOX[NRHOX-1]-RHOX[NRHOX-2])*(OPC_B+OPC_C))*MU;
     INTENSITY=0.5*(SRC_B+SRC_C)+DBNU;         // Intensity at the bottom
+    printf("bottom INTENSITY=%f, SRC_B=%f, SRC_C=%f, DBNU=%f\n", INTENSITY, SRC_B, SRC_C,DBNU);
 
     SPRIME_SAVE=0.0;                          // Initialize S'
 
@@ -7608,8 +7609,9 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
 */
       B=ALPHA*SRC_B+BETA*SRC_A+GAMMA*CNTR_AB;
       INTENSITY=EPS*INTENSITY+B;
+      printf("point B INTENSITY=%f, EPS=%f, B=%f\n", INTENSITY, EPS, B);
     }
-    printf("INTENSITY*=%f, FLUX_SCALE=%f\n", INTENSITY, FLUX_SCALE);
+    printf("Final INTENSITY=%f\n", INTENSITY);
     fflush(stdout);
     RESULT[IMU]=INTENSITY*FLUX_SCALE;
   }
