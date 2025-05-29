@@ -7553,6 +7553,9 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
       OPC_B=OPC_C;
       SRC_C=CONWL5/(exp(HNUK/T[IM-1])-1.); // Downwind point
       OPC_C=XK[IM-1];
+      printf("i=%d\n", IM);
+      printf("OPC_C=%f\n", OPC_C);
+      fflush(stdout);
 /*
   Steps in monochromatic optical depth
 */
@@ -7570,7 +7573,8 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
   Next we switch to optical depth and compute the contribution
   from the source function:
 */
-      printf("DELTA=%f, EPS=%f\n", DELTA, exp(-DELTA));
+      // printf("DELTA=%f, STEP_AB=%f, OPC_A=%f, OPC_B=%f, CNTR_AB=%f\n", DELTA, STEP_AB, OPC_A, OPC_B, CNTR_AB);
+      // fflush(stdout);
       EPS=(DELTA<100.0)?exp(-DELTA):0.0; // Avoiding underflow
 /*
   Calculate parabolic coefficients for the source function
