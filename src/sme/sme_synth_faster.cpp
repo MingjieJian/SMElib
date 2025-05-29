@@ -7609,6 +7609,8 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
       B=ALPHA*SRC_B+BETA*SRC_A+GAMMA*CNTR_AB;
       INTENSITY=EPS*INTENSITY+B;
     }
+    printf("INTENSITY*=%f, FLUX_SCALE=%f\n", INTENSITY, FLUX_SCALE);
+    fflush(stdout);
     RESULT[IMU]=INTENSITY*FLUX_SCALE;
   }
 }
