@@ -7517,8 +7517,6 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
   double CONWL5, HNUK, MU, XK[MOSIZE];
   int IM, IMU;
 
-  printf("Start, EPS=%f\n", EPS);
-
 /* Useful things for the Planck function */
 
   CONWL5=exp(50.7649141-5.*log(WLCENT[LINE]));
@@ -7526,6 +7524,8 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
 
 //  if(LINE==42177) OPMTRX1(LINE,XK,1); else OPMTRX1(LINE,XK,0);
   OPMTRX1(LINE,XK);
+  printf("outside ");
+  printf("%f, ", XK);
 
 //  if(LINE==42177) for(IM=0; IM<NRHOX; IM++) printf("IM=%d, XK[IM]=%g, CONTOP[im]=%g, %d\n",IM,XK[IM],contop[IM],MOTYPE);
 
@@ -7616,9 +7616,9 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
 */
       B=ALPHA*SRC_B+BETA*SRC_A+GAMMA*CNTR_AB;
       INTENSITY=EPS*INTENSITY+B;
-      printf("point B: IM=%d MU=%f\n", IM, MU);
-      printf("point B: INTENSITY=%f, EPS=%f, B=%f\n", INTENSITY, EPS, B);
-      fflush(stdout);
+      // printf("point B: IM=%d MU=%f\n", IM, MU);
+      // printf("point B: INTENSITY=%f, EPS=%f, B=%f\n", INTENSITY, EPS, B);
+      // fflush(stdout);
     }
     printf("Final INTENSITY=%f\n", INTENSITY);
     fflush(stdout);
@@ -8321,6 +8321,7 @@ void OPMTRX1(int LINE, double *XK)
          TEMPER, DOPL;
   short ITAU;
 
+  printf("XK inside: ");
   for(ITAU=0; ITAU<NRHOX; ITAU++)
   {
     TEMPER=T[ITAU];
@@ -8391,11 +8392,12 @@ void OPMTRX1(int LINE, double *XK)
     }
 
 /* Compute total opacity */
-
     if(MOTYPE>0)        XK[ITAU]=ALINE;
     else if(MOTYPE== 0) XK[ITAU]=ALINE/COPSTD[ITAU];
     else if(MOTYPE==-1) XK[ITAU]=ALINE;
+    printf("%f, ", XK[ITAU]);
   }
+  printf("\n");
 }
 
 #undef Z
