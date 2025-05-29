@@ -7517,6 +7517,8 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
   double CONWL5, HNUK, MU, XK[MOSIZE];
   int IM, IMU;
 
+  printf("Start, EPS=%f\n", EPS);
+
 /* Useful things for the Planck function */
 
   CONWL5=exp(50.7649141-5.*log(WLCENT[LINE]));
@@ -7568,6 +7570,7 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
   Next we switch to optical depth and compute the contribution
   from the source function:
 */
+      printf("DELTA=%f, EPS=%f\n", DELTA, exp(-DELTA));
       EPS=(DELTA<100.0)?exp(-DELTA):0.0; // Avoiding underflow
 /*
   Calculate parabolic coefficients for the source function
@@ -7609,7 +7612,9 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
 */
       B=ALPHA*SRC_B+BETA*SRC_A+GAMMA*CNTR_AB;
       INTENSITY=EPS*INTENSITY+B;
-      printf("point B INTENSITY=%f, EPS=%f, B=%f\n", INTENSITY, EPS, B);
+      printf("point B: IM=%d MU=%f\n", IM, MU);
+      printf("point B: INTENSITY=%f, EPS=%f, B=%f\n", INTENSITY, EPS, B);
+      fflush(stdout);
     }
     printf("Final INTENSITY=%f\n", INTENSITY);
     fflush(stdout);
