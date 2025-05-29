@@ -7524,8 +7524,6 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
 
 //  if(LINE==42177) OPMTRX1(LINE,XK,1); else OPMTRX1(LINE,XK,0);
   OPMTRX1(LINE,XK);
-  printf("outside ");
-  printf("%f, ", XK);
 
 //  if(LINE==42177) for(IM=0; IM<NRHOX; IM++) printf("IM=%d, XK[IM]=%g, CONTOP[im]=%g, %d\n",IM,XK[IM],contop[IM],MOTYPE);
 
@@ -7541,7 +7539,6 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
     OPC_C=XK[NRHOX-2];
     DBNU=2.0*(SRC_B-SRC_C)/((RHOX[NRHOX-1]-RHOX[NRHOX-2])*(OPC_B+OPC_C))*MU;
     INTENSITY=0.5*(SRC_B+SRC_C)+DBNU;         // Intensity at the bottom
-    printf("bottom INTENSITY=%f, SRC_B=%f, SRC_C=%f, DBNU=%f\n", INTENSITY, SRC_B, SRC_C,DBNU);
 
     SPRIME_SAVE=0.0;                          // Initialize S'
 
@@ -7553,9 +7550,6 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
       OPC_B=OPC_C;
       SRC_C=CONWL5/(exp(HNUK/T[IM-1])-1.); // Downwind point
       OPC_C=XK[IM-1];
-      printf("i=%d\n", IM);
-      printf("OPC_C=%f\n", OPC_C);
-      fflush(stdout);
 /*
   Steps in monochromatic optical depth
 */
@@ -7620,8 +7614,6 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
       // printf("point B: INTENSITY=%f, EPS=%f, B=%f\n", INTENSITY, EPS, B);
       // fflush(stdout);
     }
-    printf("Final INTENSITY=%f\n", INTENSITY);
-    fflush(stdout);
     RESULT[IMU]=INTENSITY*FLUX_SCALE;
   }
 }
@@ -8321,7 +8313,6 @@ void OPMTRX1(int LINE, double *XK)
          TEMPER, DOPL;
   short ITAU;
 
-  printf("XK inside: ");
   for(ITAU=0; ITAU<NRHOX; ITAU++)
   {
     TEMPER=T[ITAU];
@@ -8385,7 +8376,7 @@ void OPMTRX1(int LINE, double *XK)
 
 /*  Line absorption with the VOIGT function */
 
-        ALINE=VOIGT*LINEOP[ITAU][LINE];
+        ALINE=VOIGT*LINEOP[ITAU][LINE]*WLCENT[LINE];
 //        if(PRINT) printf("LINE=%d, ITAU=%d, VVOIGT=%g, AVOIGT=%g, LINEOP[ITAU][LINE]=%g\n",
 //                          LINE,ITAU,VOIGT,AVOIGT[ITAU][LINE],LINEOP[ITAU][LINE]);
       }
@@ -8395,9 +8386,7 @@ void OPMTRX1(int LINE, double *XK)
     if(MOTYPE>0)        XK[ITAU]=ALINE;
     else if(MOTYPE== 0) XK[ITAU]=ALINE/COPSTD[ITAU];
     else if(MOTYPE==-1) XK[ITAU]=ALINE;
-    printf("%f, ", XK[ITAU]);
   }
-  printf("\n");
 }
 
 #undef Z
