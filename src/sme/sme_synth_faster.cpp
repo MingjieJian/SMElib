@@ -5537,6 +5537,7 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     keep_lineop=*(short *)arg[10]; /* For several spectral segments there is no 
                                       point recomputing line opacities. This flag
                                       tells when recalculations are needed */
+    
     if(PATHLEN==0 && n>12)
     {
       PATHLEN=(*(IDL_STRING *)arg[12]).slen;
@@ -5566,7 +5567,7 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     return result;
   }
 
-  if(n>11)                 /* Check of continuum is needed at every wavelength */
+  if(n>11)                 /* Check if continuum is needed at every wavelength */
   {                         /* If this flag is true FCBLUE must be an arrays of */
                             /* the size NWSIZE. On exit FCRED keeps its meaning */
     long_continuum=*(short *)arg[11];
@@ -5575,31 +5576,25 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
 
   if(!keep_lineop)
   {
-/* Allocate temporary arrays */
+    /* Allocate temporary arrays */
 
-//    YABUND=(double *)calloc(NLINES, sizeof(double));
-//    XMASS =(double *)calloc(NLINES, sizeof(double));
-//    EXCUP =(double *)calloc(NLINES, sizeof(double));
-//    ENU4  =(double *)calloc(NLINES, sizeof(double));
-//    ENL4  =(double *)calloc(NLINES, sizeof(double));
-
+    // printf("Calculate line opacity");
     CALLOC(YABUND,NLINES, double);
     CALLOC(XMASS, NLINES, double);
     CALLOC(EXCUP, NLINES, double);
     CALLOC(ENU4,  NLINES, double);
     CALLOC(ENL4,  NLINES, double);
-//for(im=NRHOX-2; im<NRHOX; im++) printf("AVOIGT[%d]=%p, VVOIGT[%d]=%p, LINEOP[%d]=%p\n",im,AVOIGT[im],im,VVOIGT[im],im,LINEOP[im]);
+    // for(im=NRHOX-2; im<NRHOX; im++) printf("AVOIGT[%d]=%p, VVOIGT[%d]=%p, LINEOP[%d]=%p\n",im,AVOIGT[im],im,VVOIGT[im],im,LINEOP[im]);
     if(ENL4==NULL) {strncpy(result, "Not enough memory", 511); return result;}
 
-/* Check autoionization lines */
-
+    /* Check autoionization lines */
     AutoIonization();
 
-/* Initialize flags prepare central line opacities and the Voigt function parameters */
-
+    /* Initialize flags prepare central line opacities and the Voigt function parameters */
     for(line=0;line<NLINES;line++)
     {
       LINEOPAC(line);
+
       if(NWL==0)
       {
         MARK[line]=(ALMAX[line]<EPS1)?2:-1;
@@ -5614,7 +5609,7 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     FREE(XMASS);
     FREE(YABUND);
 
-// Line contribution limits
+    // Line contribution limits
     for(line=0;line<NLINES;line++) // Check the line contribution at various detunings
     {
       delta_lambda=0.2;
@@ -5633,11 +5628,12 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
         Wlim_right[line]=min(WW+delta_lambda,2000000.);
       }
     }
-//    for(line=0; line<NLINES; line++)
-//    {
-//      printf("Transf in: Line %d, mark=%d, Left:%10.8g, wlcent:%10.8g, Right:%10.8g, %d, %d\n",
-//              line,MARK[line],Wlim_left[line],WLCENT[line],Wlim_right[line],mark_total,NLINES);
-//    }
+  //  for(line=0; line<NLINES; line++)
+  //  {
+  //    printf("Transf in: Line %d, mark=%d, Left:%10.8g, wlcent:%10.8g, Right:%10.8g, %d\n",
+  //            line,MARK[line],Wlim_left[line],WLCENT[line],Wlim_right[line],NLINES);
+  //    fflush(stdout);
+  //  }
   }
 
   if(MOTYPE==3) /* If things get spherical initialize a 2D array of MUs and do the RT */
@@ -5713,10 +5709,11 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     {
       for(im=0; im<NRHOX; im++) rhox[imu*NRHOX+im]=RHOX[im]/MU[imu];
     }
-//  printf("0) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
+    // printf("0) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
     iret=RKINTS(rhox, NMU, EPS1, EPS2, FCBLUE, FCRED, TABLE, NWSIZE, NWL,
                   WL, long_continuum);
-//  printf("1) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
+    // printf("1) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
+    // fflush(stdout);
   }
 
 //  for(line=0; line<NLINES; line++)
@@ -5963,7 +5960,6 @@ int RKINTS_sph(double rhox[][2*MOSIZE], int NMU, int NRHOXs[], double EPS1, doub
   int line, line_first, line_last, i, IMU, IM, IWL;
 
 /* If the wavelength grid is pre-set, just do the calculations */
-
   if(NWL>0 && NWL<=NWSIZE)
   {
     line_first=0; line_last=NLINES-1;
@@ -6340,6 +6336,7 @@ int RKINTS(double *rhox, int NMU, double EPS1, double EPS2,
 //  t_tot=0;
 
   WL[0]=WFIRST;
+  printf("WFIRST=%f\n", WFIRST);
   OPMTRX(WFIRST, opacity_tot, opacity_cont, source, source_cont, 0, NLINES-1);
 
   TBINTG(NMU, rhox, opacity_tot, source, TABLE);
@@ -6352,9 +6349,14 @@ int RKINTS(double *rhox, int NMU, double EPS1, double EPS2,
   for(line=0; line<NLINES; line++)
   {
     WW=WLCENT[line];
+    // printf("WLCENT[line]=%f, ", WW);
+    // printf("\n", WW);
     DWL_MIN=WW*DVEL_MIN/CLIGHTcm;
+    // printf("MARK[line]=%d\n", MARK[line]);
     if(WW>WFIRST && WW<WLAST && WW-WL[IWL]>DWL_MIN && !MARK[line])
     {
+      // printf("Inside\n");
+      // fflush(stdout);
       IWL++;
       if(IWL>NWSIZE-1) return 1;
 // Add one point between the previous point and the next line center
@@ -7019,7 +7021,13 @@ void TBINTG(int Nmu, double rhox[], double opacity[], double source[],
       INTENSITY[imu]=EPS*INTENSITY[imu]+B;
     }
   }
-  for(imu=0;imu<Nmu;imu++) RESULT[imu]=INTENSITY[imu]*FLUX_SCALE;
+  
+  for(imu=0;imu<Nmu;imu++) 
+  {
+    RESULT[imu]=INTENSITY[imu]*FLUX_SCALE;
+    // printf("imu=%d, RESULT[imu]=%f\n", imu, RESULT[imu]);
+    // fflush(stdout);
+  }
 //  getrusage(0, &r_usage);
 //  t_rt+=r_usage.ru_utime.tv_sec-t1;
 }
