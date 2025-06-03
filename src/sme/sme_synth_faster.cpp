@@ -6336,7 +6336,7 @@ int RKINTS(double *rhox, int NMU, double EPS1, double EPS2,
 //  t_tot=0;
 
   WL[0]=WFIRST;
-  printf("WFIRST=%f\n", WFIRST);
+  // printf("WFIRST=%f\n", WFIRST);
   OPMTRX(WFIRST, opacity_tot, opacity_cont, source, source_cont, 0, NLINES-1);
 
   TBINTG(NMU, rhox, opacity_tot, source, TABLE);
