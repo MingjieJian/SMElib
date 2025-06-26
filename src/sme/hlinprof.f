@@ -83,17 +83,14 @@ C
       LOGICAL FIRST
       INCLUDE 'DATA.FILES'
 C
-      PARAMETER (C = 2.997925E+18, PI = 3.14159265)
-      COMMON /HSWITCH/ISTARK,ISELF,ICONV,IHE
-      
       SAVE FIRST 
 C
       DATA FIRST/.TRUE./
-      
+      PARAMETER (C = 2.997925E+18, PI = 3.14159265)
 C
 C  Set the switches here 
 C
-      
+      COMMON /HSWITCH/ISTARK,ISELF,ICONV,IHE
       ISTARK = 1
       ISELF = 2
       ICONV = 1
@@ -291,7 +288,7 @@ C
       REAL*8 WAVE,WAVE0
       INTEGER NWL,NTEMP,NNE,NLINE
       REAL SQRTPI
-      PARAMETER (NWL=60,NTEMP=13,NNE=15,NLINE=90,SQRTPI=1.77245385)
+      PARAMETER (NWL=60,NTEMP=10,NNE=15,NLINE=90,SQRTPI=1.77245385)
       REAL T(NTEMP),XNE(NNE)
       REAL WING(NNE,NLINE),F0(NNE,NLINE),WIDTH(NTEMP,NNE,NLINE),
      *     ALPHA(NWL,NTEMP,NNE,NLINE),SPROF(NWL,NTEMP,NNE,NLINE),HLIN
@@ -317,12 +314,10 @@ C
 C  Open file and process errors
 C
         IF(BYTE_SWAP.EQ.0) THEN
-        OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD')
+          OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD')
         ELSE
-          WRITE(*,*) 'ERROR: STEHLE File in Big Endian format'
-          STOP
-        !       OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD',
-        !  *         CONVERT='LITTLE_ENDIAN')
+          OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD',
+     *         CONVERT='LITTLE_ENDIAN')
         END IF
         IF(IERR.NE.0) THEN
           WRITE(*,*) 'ERROR: STEHLE did not find Hydrogen line file'
@@ -357,9 +352,9 @@ C
 C  Read line ID and construct line index
 C
         READ(1,ERR=9,END=10) (N1(LINE),M1(LINE),LINE=1,NLINE1)
-        DO 1 LINE=1,NLINE1
-        LINDEX(N1(LINE),M1(LINE))=LINE
-   1    CONTINUE
+        DO LINE=1,NLINE1
+          LINDEX(N1(LINE),M1(LINE))=LINE
+        END DO
 C
 C  Read temperatures and electron densities
 C
@@ -379,12 +374,12 @@ C  for detuning (ALPHA) and line profiles (SPROF)
 C
         READ(1,ERR=9,END=10) (((NALPHA(I,J,L),I=1,NTEMP1),J=1,NNE1), 
      *                       L=1,NLINE1)
-        DO 2 L=1,NLINE1
-        READ(1,ERR=9,END=10) (((ALPHA(K,I,J,L),K=1,NWL1),
-     *                       I=1,NTEMP1),J=1,NNE1)
-        READ(1,ERR=9,END=10) (((SPROF(K,I,J,L),K=1,NWL1),
-     *                       I=1,NTEMP1),J=1,NNE1)
-   2    CONTINUE
+        DO L=1,NLINE1
+          READ(1,ERR=9,END=10) (((ALPHA(K,I,J,L),K=1,NWL1),
+     *                         I=1,NTEMP1),J=1,NNE1)
+          READ(1,ERR=9,END=10) (((SPROF(K,I,J,L),K=1,NWL1),
+     *                         I=1,NTEMP1),J=1,NNE1)
+        END DO
         CLOSE(1)
 C
 C Re-checking NALPHA
@@ -571,11 +566,12 @@ C  I/O error processing
 C
    9  I=INDEX(HFILE,' ')-1
       IF(I.LE.0) I=LEN(HFILE)
-      WRITE(*,*) 'ERROR reading binary file in HTABLE'
+      WRITE(*,*) 'ERROR reading binary file '//HFILE(1:I)//' in HTABLE'
       STOP
   10  I=INDEX(HFILE,' ')-1
       IF(I.LE.0) I=LEN(HFILE)
-      WRITE(*,*) 'EOF found while reading binary file in HTABLE'
+      WRITE(*,*) 'EOF found while reading binary file '//HFILE(1:I)//
+     *           ' in HTABLE'
       STOP
       END
 
@@ -592,7 +588,7 @@ C
       IMPLICIT NONE
       REAL*8 WAVE,WAVE0
       INTEGER MNPROFS,MNTEMP,MNNH,MNLINE
-      PARAMETER (MNTEMP=13,MNNH=30,MNLINE=10,MNPROFS=200)
+      PARAMETER (MNTEMP=10,MNNH=30,MNLINE=10,MNPROFS=200)
       REAL*8 T(MNTEMP),NH(MNNH),NHYD,TEMP,HLIN
       REAL*8 F0(MNNH,MNLINE),
      *     MALPHA(MNPROFS,MNTEMP,MNNH,MNLINE),
@@ -617,11 +613,10 @@ C
       CHARACTER HFILE*(*)
       SAVE T,NH,F0,MALPHA,MSPROF,PALPHA,PSPROF,PNALPHA,MNALPHA,
      *     NPROFS,NTEMP,NNH,NLINE,FIRST,LINDEX
-      PARAMETER (SQRTPI=1.77245385)      
+      DATA FIRST/.TRUE./,LINDEX/10000*0/
+      PARAMETER (SQRTPI=1.77245385)
       REAL*8 DEXP10,X
       DEXP10(X)=EXP(2.30258509299405D0*X)
-      DATA FIRST/.TRUE./,LINDEX/10000*0/
-
 C
 C  Read in the table (this is done only once)
 C
@@ -631,12 +626,10 @@ C
 C  Open file and process errors
 C
         IF(BYTE_SWAP.EQ.0) THEN
-        OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD')
+          OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD')
         ELSE
-          WRITE(*,*) 'ERROR: HGRID File in Big Endian'
-          STOP
-    !       OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD',
-    !  *         CONVERT='LITTLE_ENDIAN')
+          OPEN(1,file=HFILE,IOSTAT=IERR,FORM='UNFORMATTED',STATUS='OLD',
+     *         CONVERT='LITTLE_ENDIAN')
         END IF
         IF(IERR.NE.0) THEN
           WRITE(*,*) 'ERROR: HGRID did not find Hydrogen line file'
@@ -651,9 +644,9 @@ C
 C  Read line ID and construct line index, read grid parameters
 C
         READ(1,ERR=9,END=10) (NL(LINE),NU(LINE),LINE=1,NLINE)
-        DO 401 I=1,NLINE
-           LINDEX(NL(I),NU(I))=I
- 401    CONTINUE
+        DO I=1,NLINE
+          LINDEX(NL(I),NU(I))=I
+        END DO
         READ(1,ERR=9,END=10) NNH
         READ(1,ERR=9,END=10) (NH(I),I=1,NNH)
         READ(1,ERR=9,END=10) NTEMP
@@ -1001,11 +994,12 @@ C  I/O error processing
 C
    9  I=INDEX(HFILE,' ')-1
       IF(I.LE.0) I=LEN(HFILE)
-      WRITE(*,*) 'ERROR reading binary file in HGRID'
+      WRITE(*,*) 'ERROR reading binary file '//HFILE(1:I)//' in HGRID'
       STOP
   10  I=INDEX(HFILE,' ')-1
       IF(I.LE.0) I=LEN(HFILE)
-      WRITE(*,*) 'EOF found while reading binary file in HGRID'
+      WRITE(*,*) 'EOF found while reading binary file '//HFILE(1:I)//
+     *           ' in HGRID'
       STOP
       END
 
@@ -1207,7 +1201,7 @@ c      DIMENSION PR(40),DEL(40)
 C     DIMENSION ALPHA(40),PRALPH(40)                                  
       DIMENSION PRALPH(40)                                   
       DIMENSION SVCS(6,17,40,4),ALPHA0(4)  
-      CHARACTER*(*) HVCSFILE                                
+      CHARACTER*592 HVCSFILE                                
       DATA SVCS(1,1,1,1)/0./,ALPHA0/-3.,-3.,-3.,-3./   
       SAVE SVCS
 C
@@ -1246,12 +1240,12 @@ C     TO AVOID BAD EXTRAPOLATION AT LOW DENSITY
       INE=BNE                      
       INE=MAX(MIN(INE,16),1)
       WTXNE=BNE-INE                             
-      DO 21 I=1,40                                                
-      PRALPH(I)=(1.-WTXNE)*(1.-WTTEMP)*SVCS(ITEMP  ,INE  ,I,LINE)+
-     1               (1.-WTXNE)*WTTEMP*SVCS(ITEMP+1,INE  ,I,LINE)+           
-     2               WTXNE*(1.-WTTEMP)*SVCS(ITEMP  ,INE+1,I,LINE)+
-     3                    WTXNE*WTTEMP*SVCS(ITEMP+1,INE+1,I,LINE)
-   21 CONTINUE
+      DO I=1,40                                                
+        PRALPH(I)=(1.-WTXNE)*(1.-WTTEMP)*SVCS(ITEMP  ,INE  ,I,LINE)+
+     1            (1.-WTXNE)*WTTEMP*SVCS(ITEMP+1,INE  ,I,LINE)+           
+     2                WTXNE*(1.-WTTEMP)*SVCS(ITEMP  ,INE+1,I,LINE)+
+     3                WTXNE*WTTEMP*SVCS(ITEMP+1,INE+1,I,LINE)
+      END DO
 C     NOW ALPHA INTERPOLATION
       FO=1.25E-9*XNE**.66666667
 c      DO 50 I=1,II

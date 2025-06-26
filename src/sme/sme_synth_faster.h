@@ -8,13 +8,14 @@
 
 // The SME library version (and compilation date)
 #ifndef VERSION
-#define VERSION "6.03, July 2019"
+#define VERSION "6.13, June 2025"
 #endif
 
 /* Datafile locations */
 // DATA_DIR is defined in platform.h
 
-#define DATAFILE_FE "Fe1_Bautista2017.dat.INTEL"
+// #define DATAFILE_FE "Fe1_Bautista2017.dat.INTEL"
+#define DATAFILE_FE "Fe1_Zatsarinny2019.dat.INTEL"
 #define DATAFILE_NH "NH_Stancil2018.dat.INTEL"
 #define DATAFILE_STEHLE "stehle_long.dat.INTEL"
 #define DATAFILE_BPO "bpo_self.grid.INTEL"
@@ -66,3 +67,5 @@ extern "C" const char *SME_DLL Transf(int n, void *arg[]);                     /
 extern "C" const char *SME_DLL CentralDepth(int n, void *arg[]);               /* Computes line central depths */
 extern "C" const char *SME_DLL GetLineOpacity(int n, void *arg[]);             /* Returns specific line opacity */
 extern "C" const char *SME_DLL GetLineRange(int n, void *arg[]);               /* Get validity range for every line */
+extern "C" const char *SME_DLL Contribution_functions(int n, void *arg[]); /*Compute the contribution functions */
+
