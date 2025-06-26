@@ -783,7 +783,7 @@ C
         IF(niter.ge.MAXITER) THEN
           WRITE(*,*) 'T,Pg,Pgas,Pelec,Pe_in,Pe_out,NITER=',
      *                Temp,Pg,Pgas,Pe,Pe_old,Pelec,niter,FAILED
-          write(*,*) splist(138),xnpf(138),xtotal
+c          write(*,*) splist(138),xnpf(138),xtotal
           IF(niter.gt.MAXITER*20) STOP
         END IF
 C
@@ -2262,7 +2262,7 @@ C
             IT(ISPEC)=1.D0
           ENDIF
 c          IT(ISPEC)=1.D0
-C          write(*,*) SPLIST(ISPEC),IT(ISPEC),KT(ISPEC)
+c          write(*,*) SPLIST(ISPEC),IT(ISPEC),KT(ISPEC)
         END IF
 c        write(*,*) SPLIST(ISPEC),POTION(ISPEC),PION,POTI(1)
 C
@@ -3513,6 +3513,9 @@ c      CALL LINEQ(NEQ,1,A,ELEDIM+1,IPIV,B,ELEDIM+1,INFO)
           END IF
           CALL lnEOSFCN(NEQ,P,B,A,2,PG,NCH,NLIST,IATOM,INDSP,
      *                  NAT,ZAT,NTOT,NEL,IAT,INDZAT,ABUND,KT,IT)
+          
+          
+          
           open(unit=4,file='dump.bin',form='UNFORMATTED')
           write(4) NEQ,((A(i,j),i=1,NEQ),j=1,NEQ),(B(i),i=1,NEQ)
           close(4)
@@ -4918,10 +4921,7 @@ C Check if there is relevant data in Paul Barklem's tables
 C
       CALL KP_Q_SPLN(SPNAME,T,Qm_spln,Kp_spln,D0,BARKLEM)
       IF(BARKLEM) THEN
-c         if(abs(D0-COEF(1,J))/(D0+COEF(1,J)).GT.0.05) THEN
-c           write(*,*) 'EOS: ',J,SPNAME,D0,COEF(1,J)
-c         endif
-c        D0=COEF(1,J)
+        COEF(1,J)=D0
 c        EQK =Kp_spln-D0*5039.7475D0/TLIM
         EQK =Kp_spln-D0*5040.D0/T
         EQK =10.D0**EQK

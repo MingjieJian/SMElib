@@ -10,7 +10,13 @@ C  C2-
 C  BO-
 C  CS-
 C
-      parameter (NDEF=316)
+C IDL lines to get NDEF:
+C  a=strarr(50) & read,a
+C  i=where(strmid(a,0,1) ne 'c') & a=a[i]
+C  help,where(byte(a) eq (byte(','))[0], ndef)
+C  print,'parameter (NDEF='+strtrim(ndef+1,2)+')'
+C
+      parameter (NDEF=317)
       character*(SPCHAR) default(NDEF)
       SAVE default
       data default/
@@ -30,7 +36,6 @@ C
      * 'Ba','Ba+','Ba++','La','La+','La++',
      * 'H2','CO','H2O','OH','N2','SiO','HS','H2S','NH','SiH',
      * 'CH','H2+','NO','MgH','HCl','SiS','AlOH','NH2','AlH',
-c     * 'CH','H2+','NO','MgH','HCl','SiS','AlOH',    'AlH',
      * 'CN','CO2','SO','TiO','S2','FeH' ,'NH3','HCN','HCO',
      * 'O2','CH2','HF','CaH','Al2O','AlO','CH3','SiH2',
      * 'MgO','C2','TiO2','VO2','NaH','AlCl','AlF','VO','CS',
@@ -47,7 +52,7 @@ c     * 'AlOCl','LaO','C2N','AlBO2','KCl',       'CaF',
      * 'CaO2H2','KOH','CN-','Al2O2','BaOH','SrOH','BO2',
 c     * 'CaO2H2','KOH',      'Al2O2','BaOH','SrOH','BO2',
      * 'SiF','CH-','C3','C2-','MgO2H2','BeOH','HBS','SiC2',
-c     * 'SiF','CH-','C3',      'MgO2H2','BeOH','HBS','SiC2',
+c     * 'SiF',      'C3',      'MgO2H2','BeOH','HBS','SiC2',
      * 'FeO2H2','CrO2','BeH2O2','BH3','NaCN','BeH2','Si2N',
      * 'CaCl2','NaBO2','C3H','OBF','CS2','LiOH','Al2','LiCl',
      * 'TiOCl','C2H4','CHCl','TiCl','AlOF2','KBO2','Si2C',
@@ -55,7 +60,8 @@ c     * 'SiF','CH-','C3',      'MgO2H2','BeOH','HBS','SiC2',
 c     * 'CHF',      'AlO2','BaO2H2','OTiF',      'C2N2',
      * 'SrO2H2','ClCN','AlClF','KCN','AlCl2','BaCl2','AlF2',
      * 'MgCl2',
-     * 'FeO-','BO2H2','SiH3Cl','FeCl2','Si3','SiH3F','CH3Cl',
+     * 'FeO-','H3+',
+     * 'BO2H2','SiH3Cl','FeCl2','Si3','SiH3F','CH3Cl',
      * 'SrCl2','CaF2','TiF2','LiBO2','MgClF','BeBO2','C2HCl',
      * 'TiCl2','C4','H3BO3','MgF2','BaClF','BeF2','C2HF',
      * 'BeCl2','TiOCl2','ZrCl2','BaF2','BeC2','Be2O','SrF2',

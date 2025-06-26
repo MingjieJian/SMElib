@@ -8,31 +8,32 @@
 
 // The SME library version (and compilation date)
 #ifndef VERSION
-#define VERSION "6.11, February 2025"
+#define VERSION "6.13, June 2025"
 #endif
 
 /* Datafile locations */
 // DATA_DIR is defined in platform.h
 
-#define DATAFILE_FE "Fe1_Bautista2017.dat.INTEL"
+// #define DATAFILE_FE "Fe1_Bautista2017.dat.INTEL"
+#define DATAFILE_FE "Fe1_Zatsarinny2019.dat.INTEL"
 #define DATAFILE_NH "NH_Stancil2018.dat.INTEL"
 #define DATAFILE_STEHLE "stehle_long.dat.INTEL"
 #define DATAFILE_BPO "bpo_self.grid.INTEL"
 #define DATAFILE_VCS "vcsbalmer.dat"
 
-// #ifndef IDL_DEFINE
-// #define IDL_DEFINE
-// // Define IDL String
-// typedef int IDL_STRING_SLEN_T;
-// #define IDL_STRING_MAX_SLEN 2147483647
+#ifndef IDL_DEFINE
+#define IDL_DEFINE
+// Define IDL String
+typedef int IDL_STRING_SLEN_T;
+#define IDL_STRING_MAX_SLEN 2147483647
 
-// typedef struct
-// {                         /* Define string descriptor */
-//   IDL_STRING_SLEN_T slen; /* Length of string, 0 for null */
-//   short stype;            /* type of string, static or dynamic */
-//   char *s;                /* Addr of string */
-// } IDL_STRING;
-// #endif
+typedef struct
+{                         /* Define string descriptor */
+  IDL_STRING_SLEN_T slen; /* Length of string, 0 for null */
+  short stype;            /* type of string, static or dynamic */
+  char *s;                /* Addr of string */
+} IDL_STRING;
+#endif
 // define global parameter access
 extern "C" int SME_DLL GetNLINES(void);
 extern "C" short SME_DLL GetNRHOX(void);
@@ -66,4 +67,5 @@ extern "C" const char *SME_DLL Transf(int n, void *arg[]);                     /
 extern "C" const char *SME_DLL CentralDepth(int n, void *arg[]);               /* Computes line central depths */
 extern "C" const char *SME_DLL GetLineOpacity(int n, void *arg[]);             /* Returns specific line opacity */
 extern "C" const char *SME_DLL GetLineRange(int n, void *arg[]);               /* Get validity range for every line */
-extern "C" const char *SME_DLL Contribution_functions(int n, void *arg[]);     /* Get contribution function */
+extern "C" const char *SME_DLL Contribution_functions(int n, void *arg[]); /*Compute the contribution functions */
+

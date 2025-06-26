@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 //#include "/usr/local/rsi/idl/external/export.h"
-#include "export.h"
+//#include "export.h"
 #include <ctype.h>
 #include <time.h>
 #include "platform.h"
-#include "sme_synth_faster.h"
 //#include <sys/resource.h>
+#include "sme_synth_faster.h"
 
 /* DLL export defintion */
 
@@ -36,8 +36,6 @@ static char result[MAX_OUT_LEN +1];  /* leave a space for a '\0' */
 #define min(a,b) (((a)<(b))?(a):(b))
 #define max(a,b) (((a)>(b))?(a):(b))
 #define round(x) (x >= 0)?(int)(x+0.5):(int)(x-0.5)
-
-
 
 //typedef int IDL_STRING_SLEN_T;
 //#define IDL_STRING_MAX_SLEN 2147483647
@@ -285,36 +283,6 @@ extern "C" void hlinprof_(double &, double &, float &, float &, int &, int &,
                           float &, float &, float &, float &, char *, int *,
                           int *);
 
-/* IDL entry points */
-
-extern "C" char const * SME_DLL SMELibraryVersion(int n, void *arg[]); /* Return SME library version */
-extern "C" char const * SME_DLL SetLibraryPath(int n, void *arg[]);    /* Get path to SME library */
-extern "C" char const * SME_DLL InputWaveRange(int n, void *arg[]);    /* Read in Wavelength range */
-extern "C" char const * SME_DLL SetVWscale(int n, void *arg[]);        /* Set van der Waals scaling factor */
-extern "C" char const * SME_DLL SetH2broad(int n, void *arg[]);        /* Set flag for H2 molecule */
-extern "C" char const * SME_DLL ClearH2broad(int n, void *arg[]);      /* Clear flag for H2 molecule */
-extern "C" char const * SME_DLL InputLineList(int n, void *arg[]);     /* Read in line list */
-extern "C" char const * SME_DLL OutputLineList(int n, void *arg[]);    /* Return line list */
-extern "C" char const * SME_DLL UpdateLineList(int n, void *arg[]);    /* Change line list parameters */
-extern "C" char const * SME_DLL InputModel(int n, void *arg[]);        /* Read in model atmosphere */
-extern "C" char const * SME_DLL InputDepartureCoefficients(int n, void *arg[]);
-extern "C" char const * SME_DLL GetDepartureCoefficients(int n, void *arg[]); /* Get NLTE b's for
-                                                                                 specific line */
-extern "C" char const * SME_DLL GetNLTEflags(int n, void *arg[]);      /* Get line list NLTE flags */
-extern "C" char const * SME_DLL ResetDepartureCoefficients(int n, void *arg[]); /* Reset LTE */
-extern "C" char const * SME_DLL InputAbund(int n, void *arg[]);        /* Read in abundances */
-extern "C" char const * SME_DLL Opacity(int n, void *arg[]);           /* Calculate opacities */
-extern "C" char const * SME_DLL GetOpacity(int n, void *arg[]);        /* Returns specific cont. opacity */
-extern "C" char const * SME_DLL Ionization(int n, void *arg[]);        /* Perfrom EOS calculations */
-extern "C" char const * SME_DLL GetDensity(int n, void *arg[]);        /* Returns density in g/cm^3 */
-extern "C" char const * SME_DLL GetNatom(int n, void *arg[]);          /* Returns atomic number density */
-extern "C" char const * SME_DLL GetNelec(int n, void *arg[]);          /* Returns electron number density */
-extern "C" char const * SME_DLL Transf(int n, void *arg[]);            /* Computes spectral synthesis */
-extern "C" char const * SME_DLL CentralDepth(int n, void *arg[]);      /* Computes line central depths */
-extern "C" char const * SME_DLL GetLineOpacity(int n, void *arg[]);    /* Returns specific line opacity */
-extern "C" char const * SME_DLL GetLineRange(int n, void *arg[]);      /* Get validity range for every line */
-extern "C" char const * SME_DLL Contribution_functions(int n, void *arg[]); /*Compute the contribution functions */
-
 /* Code */
 
 char *ByteSwap(char *s, int n)
@@ -363,6 +331,23 @@ int compress(char *target, char *source)
   return t-1;
 }
 
+extern "C" char const * SME_DLL SMELibraryVersion(int n, void *arg[]) /* Return SME library version */
+{
+  snprintf(result, 511, "SME Library version: 6.13, June 2025, %s", PLATFORM);
+
+  return result;
+}
+
+extern "C" char const *SME_DLL GetDataFiles(int n, void *arg[]) /* Returns continuous opacity table names */
+{
+  int l;
+
+  l=strlen(DATAFILE_FE)+1+strlen(DATAFILE_NH)+1+strlen(DATAFILE_STEHLE)+1
+   +strlen(DATAFILE_VCS)+1+strlen(DATAFILE_BPO)+1;
+  snprintf(result, l, "%s;%s;%s;%s;%s", DATAFILE_FE, DATAFILE_NH, DATAFILE_STEHLE, DATAFILE_VCS, DATAFILE_BPO);
+  return result;
+}
+
 extern "C" int SME_DLL GetNLINES()
 {
   return NLINES;
@@ -371,30 +356,6 @@ extern "C" int SME_DLL GetNLINES()
 extern "C" short SME_DLL GetNRHOX()
 {
   return NRHOX;
-}
-
-extern "C" char *SME_DLL GetSPNAME()
-{
-  return spname;
-}
-
-extern "C" char const *SME_DLL GetDataFiles(int n, void *arg[]) /* Return SME library version */
-{
-  sprintf(result, "%s;%s;%s;%s;%s", DATAFILE_FE, DATAFILE_NH, DATAFILE_STEHLE, DATAFILE_VCS, DATAFILE_BPO);
-  return result;
-}
-
-extern "C" char const *SME_DLL GetLibraryPath(int n, void *arg[])
-{
-  sprintf(result, "%s", PATH);
-  return result;
-}
-
-extern "C" char const * SME_DLL SMELibraryVersion(int n, void *arg[]) /* Return SME library version */
-{
-  snprintf(result, 511, "SME Library version: 6.11, February 2025, %s", PLATFORM);
-
-  return result;
 }
 
 extern "C" char const * SME_DLL SetLibraryPath(int n, void *arg[]) /* Return SME library version */
@@ -410,6 +371,15 @@ extern "C" char const * SME_DLL SetLibraryPath(int n, void *arg[]) /* Return SME
     return &OK_response;
   }
   strncpy(result, "No path was specified", 511);
+  return result;
+}
+
+extern "C" char const *SME_DLL GetLibraryPath(int n, void *arg[])
+{
+  int l;
+
+  l=strlen(PATH);
+  snprintf(result, l, "%s", PATH);
   return result;
 }
 
@@ -5537,7 +5507,6 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     keep_lineop=*(short *)arg[10]; /* For several spectral segments there is no 
                                       point recomputing line opacities. This flag
                                       tells when recalculations are needed */
-    
     if(PATHLEN==0 && n>12)
     {
       PATHLEN=(*(IDL_STRING *)arg[12]).slen;
@@ -5567,7 +5536,7 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     return result;
   }
 
-  if(n>11)                 /* Check if continuum is needed at every wavelength */
+  if(n>11)                 /* Check of continuum is needed at every wavelength */
   {                         /* If this flag is true FCBLUE must be an arrays of */
                             /* the size NWSIZE. On exit FCRED keeps its meaning */
     long_continuum=*(short *)arg[11];
@@ -5576,25 +5545,31 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
 
   if(!keep_lineop)
   {
-    /* Allocate temporary arrays */
+/* Allocate temporary arrays */
 
-    // printf("Calculate line opacity");
+//    YABUND=(double *)calloc(NLINES, sizeof(double));
+//    XMASS =(double *)calloc(NLINES, sizeof(double));
+//    EXCUP =(double *)calloc(NLINES, sizeof(double));
+//    ENU4  =(double *)calloc(NLINES, sizeof(double));
+//    ENL4  =(double *)calloc(NLINES, sizeof(double));
+
     CALLOC(YABUND,NLINES, double);
     CALLOC(XMASS, NLINES, double);
     CALLOC(EXCUP, NLINES, double);
     CALLOC(ENU4,  NLINES, double);
     CALLOC(ENL4,  NLINES, double);
-    // for(im=NRHOX-2; im<NRHOX; im++) printf("AVOIGT[%d]=%p, VVOIGT[%d]=%p, LINEOP[%d]=%p\n",im,AVOIGT[im],im,VVOIGT[im],im,LINEOP[im]);
+//for(im=NRHOX-2; im<NRHOX; im++) printf("AVOIGT[%d]=%p, VVOIGT[%d]=%p, LINEOP[%d]=%p\n",im,AVOIGT[im],im,VVOIGT[im],im,LINEOP[im]);
     if(ENL4==NULL) {strncpy(result, "Not enough memory", 511); return result;}
 
-    /* Check autoionization lines */
+/* Check autoionization lines */
+
     AutoIonization();
 
-    /* Initialize flags prepare central line opacities and the Voigt function parameters */
+/* Initialize flags prepare central line opacities and the Voigt function parameters */
+
     for(line=0;line<NLINES;line++)
     {
       LINEOPAC(line);
-
       if(NWL==0)
       {
         MARK[line]=(ALMAX[line]<EPS1)?2:-1;
@@ -5609,7 +5584,7 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     FREE(XMASS);
     FREE(YABUND);
 
-    // Line contribution limits
+// Line contribution limits
     for(line=0;line<NLINES;line++) // Check the line contribution at various detunings
     {
       delta_lambda=0.2;
@@ -5628,12 +5603,11 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
         Wlim_right[line]=min(WW+delta_lambda,2000000.);
       }
     }
-  //  for(line=0; line<NLINES; line++)
-  //  {
-  //    printf("Transf in: Line %d, mark=%d, Left:%10.8g, wlcent:%10.8g, Right:%10.8g, %d\n",
-  //            line,MARK[line],Wlim_left[line],WLCENT[line],Wlim_right[line],NLINES);
-  //    fflush(stdout);
-  //  }
+//    for(line=0; line<NLINES; line++)
+//    {
+//      printf("Transf in: Line %d, mark=%d, Left:%10.8g, wlcent:%10.8g, Right:%10.8g, %d, %d\n",
+//              line,MARK[line],Wlim_left[line],WLCENT[line],Wlim_right[line],mark_total,NLINES);
+//    }
   }
 
   if(MOTYPE==3) /* If things get spherical initialize a 2D array of MUs and do the RT */
@@ -5709,11 +5683,10 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     {
       for(im=0; im<NRHOX; im++) rhox[imu*NRHOX+im]=RHOX[im]/MU[imu];
     }
-    // printf("0) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
+//  printf("0) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
     iret=RKINTS(rhox, NMU, EPS1, EPS2, FCBLUE, FCRED, TABLE, NWSIZE, NWL,
                   WL, long_continuum);
-    // printf("1) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
-    // fflush(stdout);
+//  printf("1) NWL=%d, NWSIZE=%d, keep_lineop=%d\n",NWL,NWSIZE,keep_lineop);
   }
 
 //  for(line=0; line<NLINES; line++)
@@ -5960,6 +5933,7 @@ int RKINTS_sph(double rhox[][2*MOSIZE], int NMU, int NRHOXs[], double EPS1, doub
   int line, line_first, line_last, i, IMU, IM, IWL;
 
 /* If the wavelength grid is pre-set, just do the calculations */
+
   if(NWL>0 && NWL<=NWSIZE)
   {
     line_first=0; line_last=NLINES-1;
@@ -6336,7 +6310,6 @@ int RKINTS(double *rhox, int NMU, double EPS1, double EPS2,
 //  t_tot=0;
 
   WL[0]=WFIRST;
-  // printf("WFIRST=%f\n", WFIRST);
   OPMTRX(WFIRST, opacity_tot, opacity_cont, source, source_cont, 0, NLINES-1);
 
   TBINTG(NMU, rhox, opacity_tot, source, TABLE);
@@ -6349,14 +6322,9 @@ int RKINTS(double *rhox, int NMU, double EPS1, double EPS2,
   for(line=0; line<NLINES; line++)
   {
     WW=WLCENT[line];
-    // printf("WLCENT[line]=%f, ", WW);
-    // printf("\n", WW);
     DWL_MIN=WW*DVEL_MIN/CLIGHTcm;
-    // printf("MARK[line]=%d\n", MARK[line]);
     if(WW>WFIRST && WW<WLAST && WW-WL[IWL]>DWL_MIN && !MARK[line])
     {
-      // printf("Inside\n");
-      // fflush(stdout);
       IWL++;
       if(IWL>NWSIZE-1) return 1;
 // Add one point between the previous point and the next line center
@@ -7021,13 +6989,7 @@ void TBINTG(int Nmu, double rhox[], double opacity[], double source[],
       INTENSITY[imu]=EPS*INTENSITY[imu]+B;
     }
   }
-  
-  for(imu=0;imu<Nmu;imu++) 
-  {
-    RESULT[imu]=INTENSITY[imu]*FLUX_SCALE;
-    // printf("imu=%d, RESULT[imu]=%f\n", imu, RESULT[imu]);
-    // fflush(stdout);
-  }
+  for(imu=0;imu<Nmu;imu++) RESULT[imu]=INTENSITY[imu]*FLUX_SCALE;
 //  getrusage(0, &r_usage);
 //  t_rt+=r_usage.ru_utime.tv_sec-t1;
 }
@@ -7575,8 +7537,6 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
   Next we switch to optical depth and compute the contribution
   from the source function:
 */
-      // printf("DELTA=%f, STEP_AB=%f, OPC_A=%f, OPC_B=%f, CNTR_AB=%f\n", DELTA, STEP_AB, OPC_A, OPC_B, CNTR_AB);
-      // fflush(stdout);
       EPS=(DELTA<100.0)?exp(-DELTA):0.0; // Avoiding underflow
 /*
   Calculate parabolic coefficients for the source function
@@ -7618,9 +7578,6 @@ void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
 */
       B=ALPHA*SRC_B+BETA*SRC_A+GAMMA*CNTR_AB;
       INTENSITY=EPS*INTENSITY+B;
-      // printf("point B: IM=%d MU=%f\n", IM, MU);
-      // printf("point B: INTENSITY=%f, EPS=%f, B=%f\n", INTENSITY, EPS, B);
-      // fflush(stdout);
     }
     RESULT[IMU]=INTENSITY*FLUX_SCALE;
   }
@@ -8384,13 +8341,14 @@ void OPMTRX1(int LINE, double *XK)
 
 /*  Line absorption with the VOIGT function */
 
-        ALINE=VOIGT*LINEOP[ITAU][LINE]*WLCENT[LINE];
+        ALINE=VOIGT*LINEOP[ITAU][LINE];
 //        if(PRINT) printf("LINE=%d, ITAU=%d, VVOIGT=%g, AVOIGT=%g, LINEOP[ITAU][LINE]=%g\n",
 //                          LINE,ITAU,VOIGT,AVOIGT[ITAU][LINE],LINEOP[ITAU][LINE]);
       }
     }
 
 /* Compute total opacity */
+
     if(MOTYPE>0)        XK[ITAU]=ALINE;
     else if(MOTYPE== 0) XK[ITAU]=ALINE/COPSTD[ITAU];
     else if(MOTYPE==-1) XK[ITAU]=ALINE;
