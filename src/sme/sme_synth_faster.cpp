@@ -8341,7 +8341,7 @@ void OPMTRX1(int LINE, double *XK)
 
 /*  Line absorption with the VOIGT function */
 
-        ALINE=VOIGT*LINEOP[ITAU][LINE];
+        ALINE=VOIGT*LINEOP[ITAU][LINE]*WLCENT[LINE];
 //        if(PRINT) printf("LINE=%d, ITAU=%d, VVOIGT=%g, AVOIGT=%g, LINEOP[ITAU][LINE]=%g\n",
 //                          LINE,ITAU,VOIGT,AVOIGT[ITAU][LINE],LINEOP[ITAU][LINE]);
       }
