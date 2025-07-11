@@ -246,8 +246,9 @@ void   TBINTG_sph(int, double *, double *, double *, double *, int);
 void   CENTERINTG(double *, int, int, double *, double *);
 void   LINEOPAC(int);
 void   OPMTRX(double, double *, double *, double *, double *, int, int);
+void   OPMTRX1(double *, double *, double *, double *, int);
 void   OPMTRXn(double, double *, double *, double *);
-void   OPMTRX1(int, double *);
+void   OPMTRX2(int, double *);
 int    Contrib_PP(double *, int, double, double, double *, double *,
                   int, int &, double *, short);
 int    Contrib_SPH(double rhox[][2*MOSIZE], int, int NRHOXs[], double, double,
@@ -5780,7 +5781,7 @@ extern "C" char const * SME_DLL CentralDepth(int n, void *arg[])
     C++ Version: January 15, 1999
 */
 
-  double TBL[81], WEIGHTS[81], *MU, EPS1, FC, s0, s1, opacity[MOSIZE], wlstd;
+  double TBL[81], TBC[81], WEIGHTS[81], *MU, EPS1, FC, s0, s1, opacity[MOSIZE], wlstd;
   float *TABLE;
   int NMU, IMU, line, im, IM, NWSIZE;
 
@@ -5885,13 +5886,17 @@ extern "C" char const * SME_DLL CentralDepth(int n, void *arg[])
   {
     FC=0.0;
     CONTOP(WLCENT[line], opacity); /* Compute continuous opacity at the line center */
+    CENTERINTG(MU, NMU, line, TBL, TBC);
+//    printf("%d %d %10.3g %10.3g %10.3g %10.3g %10.3g %10.3g %10.3g\n",
+//    line,NMU,TBL[0],TBL[1],TBL[2],TBL[3],TBL[4],TBL[5],TBL[6]); 
 
-    CENTERINTG(MU, NMU, line, opacity, TBL);
     for(IMU=0; IMU<NMU; IMU++)
     {
-      TABLE[line]=TABLE[line]+WEIGHTS[IMU]*TBL[IMU];
-      FC=FC+WEIGHTS[IMU]*FCINTG(MU[IMU], WLCENT[line], opacity);
+      TABLE[line]+=WEIGHTS[IMU]*TBL[IMU];
+      FC+=WEIGHTS[IMU]*TBC[IMU];
+//      FC=FC+WEIGHTS[IMU]*FCINTG(MU[IMU], WLCENT[line], opacity);
     }
+//    printf("%d %10.3g %10.3g %10.3g\n", line,FC,TABLE[line],1.0-TABLE[line]/FC);
     TABLE[line]=(TABLE[line]<FC)? 1.0-TABLE[line]/FC:0.0;
   }
 
@@ -7473,114 +7478,27 @@ void Contrib_Intens_SPH(int NRHOX, double RHOX[], double opacity[], double sourc
   }
 }
 
-void CENTERINTG(double *MUs, int NMU, int LINE, double *contop, double *RESULT)
+void CENTERINTG(double *MU, int NMU, int LINE, double *TBL, double *TBC)
 {
 /*
-  Quadratic DELO with Bezier spline RT solver
+  Central line depth solver
   AUTHOR: N.Piskunov
   LAST UPDATE: May 4, 2009
+               June 10, 2025: Replaced a copy of DELO RT solver with standard calls
+                              for opacity/source function vectors and for RT solver
 */
-  double OPC_A, OPC_B, OPC_C, SRC_A, SRC_B, SRC_C, INTENSITY;
-  double CNTR_AB, CNTR_BC, SPRIME_A, SPRIME_B;
-  double STEP_AB, STEP_BC, DER, DER1, DELTA, DELTA1;
-  double ALPHA, BETA, GAMMA, EPS, B, LAMBDA, SPRIME_SAVE, DBNU;
-  double CONWL5, HNUK, MU, XK[MOSIZE];
-  int IM, IMU;
+  double opacity_tot[MOSIZE], opacity_cont[MOSIZE], source[MOSIZE],
+         source_cont[MOSIZE], rhox[MUSIZE*MOSIZE];
+  int imu, im;
 
-/* Useful things for the Planck function */
-
-  CONWL5=exp(50.7649141-5.*log(WLCENT[LINE]));
-  HNUK=1.43868e8/WLCENT[LINE];
-
-//  if(LINE==42177) OPMTRX1(LINE,XK,1); else OPMTRX1(LINE,XK,0);
-  OPMTRX1(LINE,XK);
-
-//  if(LINE==42177) for(IM=0; IM<NRHOX; IM++) printf("IM=%d, XK[IM]=%g, CONTOP[im]=%g, %d\n",IM,XK[IM],contop[IM],MOTYPE);
-
-  if(MOTYPE) for(IM=0; IM<NRHOX; IM++) XK[IM]=XK[IM]+contop[IM];
-  else       for(IM=0; IM<NRHOX; IM++) XK[IM]=XK[IM]+contop[IM]/COPSTD[IM];
-
-  for(IMU=0; IMU<NMU; IMU++)
+  for(imu=0; imu<NMU; imu++) /* Prepare RHOX arrays for each Mu */
   {
-    MU=MUs[IMU];
-    SRC_B=CONWL5/(exp(HNUK/T[NRHOX-1])-1.);   // Source function
-    SRC_C=CONWL5/(exp(HNUK/T[NRHOX-2])-1.);
-    OPC_B=XK[NRHOX-1];                        // Opacities
-    OPC_C=XK[NRHOX-2];
-    DBNU=2.0*(SRC_B-SRC_C)/((RHOX[NRHOX-1]-RHOX[NRHOX-2])*(OPC_B+OPC_C))*MU;
-    INTENSITY=0.5*(SRC_B+SRC_C)+DBNU;         // Intensity at the bottom
-
-    SPRIME_SAVE=0.0;                          // Initialize S'
-
-    for(IM=NRHOX-2; IM>0; IM--) // Work your way from the deepest
-    {                           // layer to the surface
-      SRC_A=SRC_B;              // Shift source functions and opacities
-      OPC_A=OPC_B;
-      SRC_B=SRC_C;
-      OPC_B=OPC_C;
-      SRC_C=CONWL5/(exp(HNUK/T[IM-1])-1.); // Downwind point
-      OPC_C=XK[IM-1];
-/*
-  Steps in monochromatic optical depth
-*/
-      STEP_AB=(RHOX[IM+1]-RHOX[IM  ])/MU;
-      STEP_BC=(RHOX[IM  ]-RHOX[IM-1])/MU;
-      DER =(OPC_B-OPC_A)/STEP_AB;
-      DER1=(OPC_C-OPC_B)/STEP_BC;
-      LAMBDA=(1.0+STEP_BC/(STEP_AB+STEP_BC))/3.0;
-      SPRIME_A=(DER*DER1>0.0)?DER/(LAMBDA*DER1+(1.0-LAMBDA)*DER)*DER1:0.0;
-      CNTR_AB=OPC_B-STEP_AB/2.0*SPRIME_A;
-      CNTR_BC=OPC_B+STEP_BC/2.0*SPRIME_A;
-      DELTA =STEP_AB/3.0*(OPC_A+OPC_B+CNTR_AB);
-      DELTA1=STEP_BC/3.0*(OPC_B+OPC_C+CNTR_BC);
-/*
-  Next we switch to optical depth and compute the contribution
-  from the source function:
-*/
-      EPS=(DELTA<100.0)?exp(-DELTA):0.0; // Avoiding underflow
-/*
-  Calculate parabolic coefficients for the source function
-  Special provision is taken for the case of a very small
-  DELTA resulting in precision loss when evaluating EPS and differences.
-  Here we do Taylor expansion up to delta^3 for ALPHA, BETA and GAMMA.
-*/
-      if(DELTA<1.e-3)  // Use analytical expansion for small DELTA
-      {
-        ALPHA=DELTA/3.0-DELTA*DELTA/12.0+DELTA*DELTA*DELTA/60.0;
-        BETA =DELTA/3.0-DELTA*DELTA/ 4.0+DELTA*DELTA*DELTA/10.0;
-        GAMMA=DELTA/3.0-DELTA*DELTA/ 6.0+DELTA*DELTA*DELTA/20.0;
-      }
-      else             // or accurate calculations otherwise
-      {
-        ALPHA=(DELTA*DELTA-2.0*DELTA+2.0-2.0*EPS)/(DELTA*DELTA);
-        BETA =(2.0-(2.0+2.0*DELTA+DELTA*DELTA)*EPS)/(DELTA*DELTA);
-        GAMMA=(2.0*DELTA-4.0+(2.0*DELTA+4.0)*EPS)/(DELTA*DELTA);
-      }
-/*
-  The last thing is the control parameter in optical path:
-*/
-      DER =(SRC_B-SRC_A)/DELTA;
-      DER1=(SRC_C-SRC_B)/DELTA1;
-      LAMBDA=(1.0+DELTA1/(DELTA+DELTA1))/3.0;
-      SPRIME_A=SPRIME_SAVE;
-      SPRIME_B=(DER*DER1>0.0)?DER/(LAMBDA*DER1+(1.0-LAMBDA)*DER)*DER1:0.0;
-      SPRIME_SAVE=SPRIME_B;
-      if(IM==NRHOX-2)
-      {
-        CNTR_AB=SRC_B-DELTA/2.0*SPRIME_B;
-      }
-      else
-      {
-        CNTR_AB=(SRC_A+DELTA*0.5*SPRIME_A+SRC_B-DELTA*0.5*SPRIME_B)*0.5;
-      }
-/*
-  Finally, we are ready to compute the intensity in point B
-*/
-      B=ALPHA*SRC_B+BETA*SRC_A+GAMMA*CNTR_AB;
-      INTENSITY=EPS*INTENSITY+B;
-    }
-    RESULT[IMU]=INTENSITY*FLUX_SCALE;
+    for(im=0; im<NRHOX; im++) rhox[imu*NRHOX+im]=RHOX[im]/MU[imu];
   }
+
+  OPMTRX1(opacity_tot, opacity_cont, source, source_cont, LINE);
+  TBINTG(NMU, rhox, opacity_tot,  source,      TBL);
+  TBINTG(NMU, rhox, opacity_cont, source_cont, TBC);
 }
 
 #undef FLUX_SCALE
@@ -8244,14 +8162,208 @@ void OPMTRX(double WAVE, double *XK, double *XC, double *source_line,
 //  t_op+=r_usage.ru_utime.tv_sec-t1;
 }
 
+void OPMTRX1(double *XK, double *XC, double *source_line, 
+             double *source_cont, int LINE)
+{
+/*
+   THIS FUNCTION CALCULATES THE OPACITY OR OPACITY RATIO (OPACWL/OPACSTD)
+   PER GRAMM OF STELLAR MATER (CM**2/GM) PER ANGSTROEM AT DEPTH #IM
+   OF THE STANDARD MODEL DEPTH SCALE. WAVELENGTH IS TAKEN EITHER FROM
+   WAVE (ICODE=0) OR FROM EDGES OF SPECTRAL INTERVAL (ICODE=1,2).
+
+   Author: N.Piskunov
+
+                    pi*e^2
+   Line opacity is: ------ * gf * N_absorb * STIM * f(wl-wl0)
+                     m*c
+ 
+   where the line profile f(wl) is assumed to be nomalized so that:
+ 
+   \integ f(wl-wl0) d wl = 1
+ 
+   This is true for Voigt, Hydrogen and (I hope) Fano profiles.
+                                                      1
+   E.g., in case of Voigt profile f(wl-wl0)= -------------------- * H(a,v)
+                                             sqrt(pi)*del_nu_Dopp
+   where del_Dopp = DNDOPL  is in Hz,
+
+   where H(a,v) is the Voigt function with normalization:
+   \integ H(a,v) d v = sqrt(pi)
+ 
+   Two Hydrogen line profiles are computed externally by Kurucz
+   approximation (HLINOP) or by interpolation in Stehle's tables (HTABLE)
+   and are area normalized!
+
+   Therefore the normalization factor Z=PI*e^2/(m*c) with speed
+   of light in cm/s. The net result is that Z is in cm^2/s !!!
+
+   Other constants: K  - Boltzmann's constant J/K,
+                    M0 - unit atomic mass kg (Carbon 12 scale),
+                    A0 - Bohr radius m
+
+   Author: N.Piskunov
+
+   C++ Version: October 26, 1994
+   UPDATES: May 26, 1999
+                 Consistent interface to HLINOP (same as in SYNTH)
+            Jan 20, 2010
+                Temperature dependent van der Waals if ALPHA and SIGMA are
+                available and reduced mass of perturbers by Paul Barklem
+            Aug 26, 2010
+                Added calculations of continuum opacity and the source
+                function
+*/
+
+  double HNUXXX, DDWL;
+  double OPCONB, OPCONR, OPCON, DNDOPL, DLDOPL, A, V,
+         XNELEC, XNATOM, H1FRC, HE1FRC,
+         ALINE, WLC, GQST, SHFT, VOIGT, TEMPER, wave, wlcent,
+         DOPL, ALINE1, CONWL5, HNUK, EHNUKT, XNLTE, SRC_cont, SRC_line;
+  double opcon[MOSIZE];
+  short ion, ITAU;
+  int i_cont;
+
+//  struct rusage r_usage;
+//  time_t t1;
+//  getrusage(0, &r_usage);
+//  t1=r_usage.ru_utime.tv_sec;
+
+  wave  =WLCENT[LINE];
+  wlcent=wave;
+  CONWL5=exp(50.7649141-5.*log(wave));
+  HNUK=1.43868e8/wave;
+
+  CONTOP(wave, opcon);
+  for(ITAU=0; ITAU<NRHOX; ITAU++)
+  {
+    TEMPER=T[ITAU];
+    OPCON=opcon[ITAU];
+    XNELEC=XNE[ITAU];                  /* Electron number density */
+    XNATOM=XNA[ITAU];                  /* Atom number density     */
+
+    EHNUKT=exp(HNUK/TEMPER);
+    if(initNLTE)
+    {
+      SRC_cont=CONWL5/(EHNUKT-1.);          // LTE source function used for continuum
+      source_cont[ITAU]=SRC_cont;
+      source_line[ITAU]=0.;
+      XNLTE=BNLTE_low[LINE][ITAU]/(EHNUKT-1.                                         )*
+                                  (EHNUKT-BNLTE_upp[LINE][ITAU]/BNLTE_low[LINE][ITAU]);
+      SRC_line=CONWL5/                    // NLTE source function for line
+               (BNLTE_low[LINE][ITAU]/BNLTE_upp[LINE][ITAU]*EHNUKT-1.);
+    }
+    else
+    {
+      source_cont[ITAU]=CONWL5/(EHNUKT-1.);
+      source_line[ITAU]=source_cont[ITAU];
+    }
+
+/* Compute opacity and sources function for the line center */
+
+    if(!strncmp(spname+8*LINE, "H ", 2))  // This is a hydrogen line
+    {
+      int NBLO, NBUP; double HNORM;
+      float temper, xnelec, h1frc, he1frc, dopl, aline1, aline2;
+
+      NBLO=(int)(GAMQST[LINE]+0.1);
+      NBUP=(int)(GAMVW[LINE] +0.1);
+
+      temper=TEMPER;
+      xnelec=XNE[ITAU];
+      h1frc =H1FRACT[ITAU];
+      he1frc=HE1FRACT[ITAU];
+      dopl  =VVOIGT[ITAU][LINE];
+      hlinprof_(wave,wlcent,temper,xnelec,NBLO,NBUP,
+                h1frc,he1frc,dopl,aline1,PATH,&PATHLEN,&change_byte_order);
+      ALINE1=aline1*LINEOP[ITAU][LINE]*wave*wave;
+      if(initNLTE)
+      {
+        ALINE1*=XNLTE;  // NLTE correction to the line opacity
+        source_line[ITAU]=ALINE1*SRC_line;
+      }
+    }
+    else   // Non-hydrogen line
+    {
+      double UAV, V4, W4;
+
+      if(IDHEL[LINE]>0)
+      {
+        GAMHE(IDHEL[LINE], TEMPER, XNELEC, FRACT[ITAU][1], GQST, SHFT);
+        wlcent+=SHFT;
+      }
+
+      A=AVOIGT[ITAU][LINE];
+
+/*  VOIGT function calculation: Humlicek, J. 1982, J.Q.S.R.T. 27, 437 */
+
+      UAV=A*A;
+      if(A>=15.)
+        W4=A*0.5641896/(0.5+UAV);
+      else if(A>=5.5)
+        W4=A*(1.410474+UAV*0.5641896)/(0.75+UAV*(3.+UAV));
+      else if(A>=-0.176)
+        W4=(16.4955+A*(20.20933+A*(11.96482+
+                    A*(3.778987+A*0.5642236))))/(16.4955+
+                    A*(38.82363+A*(39.27121+
+                    A*(21.69274+A*(6.699398+A)))));
+      else
+      {
+        W4=A*(36183.31-UAV*(3321.9905-UAV*(1540.787-
+                       UAV*(219.0313 -UAV*(35.76683-
+                       UAV*(1.320522 -UAV*.56419))))));
+        V4=(32066.6 -UAV*(24322.84-UAV*(9022.228-UAV*(2186.181-UAV*
+           (364.2191-UAV*(61.57037-UAV*(1.841439-UAV)))))));
+        W4=exp(UAV)-W4/V4;
+      }
+      VOIGT=W4;
+
+/*  Line absorption with the VOIGT function */
+
+      ALINE1=VOIGT*LINEOP[ITAU][LINE];
+      if(initNLTE)
+      {
+        ALINE1*=XNLTE;  // NLTE correction to the line opacity
+        source_line[ITAU]=ALINE1*SRC_line;
+      }
+      ALINE=ALINE1;
+//        printf("%d %d %10.8g %10.8g %10.8g %10.8g\n"
+//               ,ITAU,NRHOX,wave,A,ALINE1/VOIGT,ALINE1);
+    }
+
+/* Compute total opacity */
+
+    if(MOTYPE>0)        // RHOX model
+    {
+      XK[ITAU]=ALINE+OPCON;
+      XC[ITAU]=OPCON;
+//      printf("%d %d %g %g\n",LINE,ITAU, ALINE, OPCON);
+    }
+    else if(MOTYPE== 0) // TAU model
+    {
+      XK[ITAU]=(ALINE+OPCON)/COPSTD[ITAU];
+      XC[ITAU]=OPCON/COPSTD[ITAU];
+    }
+    else if(MOTYPE==-1)
+    {
+      XK[ITAU]=ALINE;
+      XC[ITAU]=OPCON;
+    }
+    if(initNLTE) source_line[ITAU]=(source_line[ITAU]+OPCON*SRC_cont)/(ALINE+OPCON);
+  }
+//  getrusage(0, &r_usage);
+//  t_op+=r_usage.ru_utime.tv_sec-t1;
+}
+
 #undef Z
 #undef PI4
 #undef K
 #undef M0
 #undef A0
 
-//void OPMTRX1(int LINE, double *XK, int PRINT)
-void OPMTRX1(int LINE, double *XK)
+
+
+//void OPMTRX2(int LINE, double *XK, int PRINT)
+void OPMTRX2(int LINE, double *XK)
 {
 /*
    THIS FUNCTION CALCULATES THE OPACITY OR OPACITY RATIO (OPACWL/OPACSTD)
@@ -8341,7 +8453,7 @@ void OPMTRX1(int LINE, double *XK)
 
 /*  Line absorption with the VOIGT function */
 
-        ALINE=VOIGT*LINEOP[ITAU][LINE];
+        ALINE=VOIGT*LINEOP[ITAU][LINE]*WLCENT[LINE];
 //        if(PRINT) printf("LINE=%d, ITAU=%d, VVOIGT=%g, AVOIGT=%g, LINEOP[ITAU][LINE]=%g\n",
 //                          LINE,ITAU,VOIGT,AVOIGT[ITAU][LINE],LINEOP[ITAU][LINE]);
       }
