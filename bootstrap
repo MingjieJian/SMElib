@@ -1,3 +1,14 @@
 #! /bin/sh
 
+# ─────────────────────────────────────────────────────────────
+# ① 固定使用 Homebrew GNU 工具链，而不是系统 clang       ### NEW
+#    ─ 取得 gcc 主版本号，保证同一前缀
+#    ─ 把 CC / CXX / FC 指到 gcc-<ver>, g++-<ver>, gfortran
+# ─────────────────────────────────────────────────────────────
+GCCVER=$(gfortran -dumpversion | cut -d. -f1)         ### NEW
+export CC="gcc-${GCCVER}"                             ### NEW
+export CXX="g++-${GCCVER}"                            ### NEW
+export FC="gfortran"                                  ### NEW
+
+# ② 调用 autoreconf 生成 configure/libtool              ### NEW
 autoreconf --verbose --install --symlink

@@ -20,6 +20,10 @@ Note that depending on your system you might have to install libgfortran as well
  - SMELib needs the datafiles to be present, or it will fail silently. It is therefore recommended to use the included `setLibraryPath(path-to-the-datafiles)` function. While SMElib comes with a default location when it is compiled, the location is dependant on the machine it is run on. You can check the currently set path with `getLibraryPath()` and the names of the required datafiles with `GetDataFiles()`.
  - On Mac OSX the absolute path of the libraries is coded into the .dylib files. If they are moved or renamed they need to be changed with `install_name_tool -id <fullpath> libsme.dylib` where fullpath is the full absolute path to this .dylib
 
+## Prerequisites
+
+- install `autoconf`, `automake`, `libtool` and `gcc`
+- `export PATH="/opt/homebrew/opt/libtool/bin:$PATH"`
 
 ## Build
 It is also possible to build the library yourself. This requires a C and a Fortran 77 compiler.
