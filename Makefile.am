@@ -68,5 +68,7 @@ $(top_srcdir)/.version:
 dist-hook:
 	echo '$(VERSION)' > $(distdir)/.tarball-version
 
-install-data-hook:
-	install_name_tool -id @rpath/libsme.5.dylib $(DESTDIR)$(libdir)/libsme.5.dylib
+if MACOS
+	install-data-hook:
+		install_name_tool -id @rpath/libsme.5.dylib $(DESTDIR)$(libdir)/libsme.5.dylib
+endif
