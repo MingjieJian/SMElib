@@ -40,6 +40,6 @@ mv lib_flat lib
 
 if [[ "$UNAME" == "Darwin" ]]; then
     # ---------- macOS ----------
-    cp -n "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libstdc++.6.dylib" lib/
-    cp -n "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libgfortran.5.dylib" lib/
+    cp -nf "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libstdc++.6.dylib" lib/
+    cp -nf "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libgfortran.5.dylib" lib/
 fi

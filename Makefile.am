@@ -20,6 +20,10 @@ libsme_la_CPPFLAGS = -fPIC -shared -O3
 libsme_la_FFLAGS = -fPIC -shared -O3
 libsme_la_LIBADD = -lc -lm -lstdc++ -lgfortran
 
+if MACOS
+	libsme_la_LDFLAGS += -Wl,-rpath,@loader_path -Wl,-install_name,@rpath/libsme.5.dylib
+endif
+
 dist_pkgdata_DATA = src/data/bpo_self.grid.INTEL \
 	src/data/Fe1_Bautista2017.dat.INTEL \
 	src/data/Fe1_Zatsarinny2019.dat.INTEL \
@@ -63,3 +67,6 @@ $(top_srcdir)/.version:
 	mv $@-t $@
 dist-hook:
 	echo '$(VERSION)' > $(distdir)/.tarball-version
+
+install-data-hook:
+	install_name_tool -id @rpath/libsme.5.dylib $(DESTDIR)$(libdir)/libsme.5.dylib

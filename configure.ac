@@ -2,6 +2,9 @@
 AC_INIT([libsme], [6.03], [nikolai.piskunov@physics.uu.se])
 AC_CANONICAL_TARGET
 
+# Mac trigger
+AM_CONDITIONAL([MACOS], [case "$host_os" in *darwin*) true;; *) false;; esac])
+
 # Use Automake
 AM_INIT_AUTOMAKE([subdir-objects])
 LT_INIT
