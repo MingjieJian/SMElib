@@ -42,4 +42,6 @@ if [[ "$UNAME" == "Darwin" ]]; then
     # ---------- macOS ----------
     cp -nf "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libstdc++.6.dylib" lib/
     cp -nf "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libgfortran.5.dylib" lib/
+    chmod 755 lib/libgfortran.5.dylib
+    chmod 755 lib/libstdc++.6.dylib
 fi
