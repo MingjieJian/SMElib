@@ -64,6 +64,7 @@ libtool
 install-sh
 depcomp
 configure
+configure~
 config.sub
 config.log
 config.guess

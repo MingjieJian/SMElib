@@ -22,8 +22,9 @@ Note that depending on your system you might have to install libgfortran as well
 
 ## Prerequisites
 
+`Homebrew` needs to be installed.
+
 - install `autoconf`, `automake`, `libtool` and `gcc`
-- `export PATH="/opt/homebrew/opt/libtool/bin:$PATH"`
 
 ## Build
 It is also possible to build the library yourself. This requires a C and a Fortran 77 compiler.

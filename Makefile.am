@@ -22,6 +22,7 @@ libsme_la_LIBADD = -lc -lm -lstdc++ -lgfortran
 
 dist_pkgdata_DATA = src/data/bpo_self.grid.INTEL \
 	src/data/Fe1_Bautista2017.dat.INTEL \
+	src/data/Fe1_Zatsarinny2019.dat.INTEL \
 	src/data/NH_Stancil2018.dat.INTEL \
 	src/data/stehle_long.dat.INTEL \
 	src/data/vcsbalmer.dat
