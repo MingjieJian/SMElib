@@ -42,4 +42,7 @@ if [[ "$UNAME" == "Darwin" ]]; then
     # ---------- macOS ----------
     cp -nf "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libstdc++.6.dylib" lib/
     cp -nf "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libgfortran.5.dylib" lib/
+elif [[ "$UNAME" == "Linux" ]]; then
+    # ---------- Linux ----------
+    cp -nf "$(gcc -print-file-name=libgfortran.so)" lib/
 fi
