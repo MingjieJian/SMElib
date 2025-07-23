@@ -38,6 +38,8 @@ rsync -aL lib/ lib_flat/
 rm -r lib
 mv lib_flat lib
 
+ls lib/
+
 # if [[ "$UNAME" == "Darwin" ]]; then
 #     # ---------- macOS ----------
 #     cp -nf "$BREW_PREFIX/opt/gcc/lib/gcc/$GCC_MAJOR/libstdc++.6.dylib" lib/
