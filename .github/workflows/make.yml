@@ -55,7 +55,7 @@ jobs:
 
     steps:
       - run: yum install -y zip python3-pip python3-devel
-      - run: git clone https://github.com/AWehrhahn/SMElib .
+      - run: git clone https://github.com/MingjieJian/SMElib .
       - name: Install F2C & Compile libf2c.a
         if: matrix.compiler == 'f2c'
         run: |
@@ -124,11 +124,6 @@ jobs:
             packages: gfortran python3-dev
             outputs: lib share
             makefile: Makefile.am
-          # - name: ubuntu-f2c
-          #   runs_on: ubuntu-latest
-          #   packages: f2c
-          #   outputs: lib share python3-dev
-          #   makefile: Makefile_f2c.am
           - name: windows-gfortran
             runs_on: ubuntu-latest
             packages: gfortran mingw-w64 mingw-w64-tools mingw-w64-common gfortran-mingw-w64 gfortran-mingw-w64-x86-64 gcc-mingw-w64 gcc-mingw-w64-x86-64 g++-mingw-w64 g++-mingw-w64-x86-64 python3-dev
@@ -137,35 +132,22 @@ jobs:
             config_flags: --build=x86_64-pc-linux-gnu --host=x86_64-w64-mingw32
             outputs: bin share
             makefile: Makefile.am
-          #          F2C doesn't work for Windows, use gfortran instead
-          #          will figure this out when possible
-          #          - name: windows-f2c
-          #            runs_on: ubuntu-latest
-          #            packages: f2c mingw-w64 mingw-w64-tools mingw-w64-common gcc-mingw-w64 gcc-mingw-w64-x86-64 g++-mingw-w64 g++-mingw-w64-x86-64
-          #            cxx: x86_64-w64-mingw32-gcc
-          #            config_flags: --build=x86_64-pc-linux-gnu --host=x86_64-w64-mingw32
-          #            outputs: bin share
-          - name: macos-gfortran
-            runs_on: macos-11
-            packages: automake libtool
-            cxx: gcc-9
-            f77: gfortran-9
+          - name: macos-intel-gfortran
+            runs_on: macos-13
+            arch: x86_64
+            packages: automake libtool gcc
+            # cxx: gcc-9
+            # f77: gfortran-9
             outputs: lib share
             makefile: Makefile.am
-          - name: macos-12-gfortran
-            runs_on: macos-12
-            packages: automake libtool
-            cxx: gcc-11
-            f77: gfortran-11
+          - name: macos-arm64-gfortran
+            runs_on: macos-15
+            arch: arm64
+            packages: automake libtool gcc
+            # cxx: gcc-11
+            # f77: gfortran-11
             outputs: lib share
             makefile: Makefile.am
-          # F2C also fails on MacOSX, because the F2C library is difficult to install
-          #- name: macos-f2c
-          #  runs_on: macos-latest
-          #  taps: FranklinChen/tap
-          #  packages: automake libtool
-          #  cxx: gcc-9
-          #  outputs: lib share
 
     # The CMake configure and build commands are platform agnostic and should work equally
     # well on Windows or Mac.  You can convert this to a matrix build if you need
@@ -176,57 +158,120 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Install packages
+      - name: Install packages (Ubuntu)
         if: matrix.runs_on == 'ubuntu-latest'
         run: sudo apt-get install -y ${{ matrix.packages }}
 
-      - name: Install packages
-        if: matrix.runs_on == 'macos-11' || matrix.runs_on == 'macos-12'
-        run: brew tap ${{ matrix.taps }} && brew install ${{ matrix.packages }}
-
-      - name: Install F2C
-        if: matrix.name == 'macos-f2c'
-        run: brew install --verbose --HEAD franklinchen/tap/f2c
-
-      - name: Run F2C
-        if: matrix.name == 'ubuntu-f2c' || matrix.name == 'windows-f2c' || matrix.name == 'macos-f2c'
-        run: f2c -w -a -C++ -Nn1604 -Nq1200 -dsrc/eos/ src/eos/*.f & f2c -w -a -C++ -dsrc/sme/ src/sme/*.f
+      - name: Install packages (MacOS)
+        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
+        run: |
+          brew update
+          brew tap ${{ matrix.taps }}
+          brew install ${{ matrix.packages }}
+      - name: Select GNU compilers (macOS)
+        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
+        run: |
+          BREW_PREFIX="$(brew --prefix)"
+          # gfortran 通常有无版本号两个名字，取到主版本号以匹配 gcc/g++
+          FVER="$($BREW_PREFIX/bin/gfortran -dumpversion | cut -d. -f1 || echo 14)"
+          echo "CC=$BREW_PREFIX/bin/gcc-$FVER"       >> $GITHUB_ENV
+          echo "CXX=$BREW_PREFIX/bin/g++-$FVER"      >> $GITHUB_ENV
+          # gfortran 可能有无版本号，可都尝试
+          if [ -x "$BREW_PREFIX/bin/gfortran-$FVER" ]; then
+            echo "FC=$BREW_PREFIX/bin/gfortran-$FVER" >> $GITHUB_ENV
+            echo "F77=$BREW_PREFIX/bin/gfortran-$FVER" >> $GITHUB_ENV
+          else
+            echo "FC=$BREW_PREFIX/bin/gfortran" >> $GITHUB_ENV
+            echo "F77=$BREW_PREFIX/bin/gfortran" >> $GITHUB_ENV
+          fi
+          # 架构与最小系统版本：按矩阵 arch 区分
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            echo "CFLAGS=-O3 -arch x86_64 -mmacosx-version-min=11.0"   >> $GITHUB_ENV
+            echo "CXXFLAGS=-O3 -arch x86_64 -mmacosx-version-min=11.0" >> $GITHUB_ENV
+            echo "FFLAGS=-O3 -arch x86_64 -mmacosx-version-min=11.0"   >> $GITHUB_ENV
+            echo "LDFLAGS=-arch x86_64 -mmacosx-version-min=11.0"      >> $GITHUB_ENV
+          else
+            echo "CFLAGS=-O3 -arch arm64 -mmacosx-version-min=12.0"    >> $GITHUB_ENV
+            echo "CXXFLAGS=-O3 -arch arm64 -mmacosx-version-min=12.0"  >> $GITHUB_ENV
+            echo "FFLAGS=-O3 -arch arm64 -mmacosx-version-min=12.0"    >> $GITHUB_ENV
+            echo "LDFLAGS=-arch arm64 -mmacosx-version-min=12.0"       >> $GITHUB_ENV
+          fi
 
       - name: Replace Makefile.am
         if: matrix.makefile != 'Makefile.am'
         run: |
           rm Makefile.am
           mv ${{ matrix.makefile }} Makefile.am
-      
-      - name: Replace Makefile.am
-        if: matrix.name == 'macos-f2c'
-        run: rm Makefile.am && mv Makefile_mac.am Makefile.am
 
-      - name: Copy F2C headers
-        if: matrix.name == 'windows-f2c'
-        run: cp	/usr/include/f2c.h src/eos/ & cp /usr/include/f2c.h src/sme/
-
-      - name: Run Bootstrap and Configure
+      - name: Run Bootstrap, Configure and install (Ubuntu)
         env:
           CXX: ${{ matrix.cxx }}
           F77: ${{ matrix.f77 }}
-        run: ./bootstrap && ./configure --prefix=$PWD ${{ matrix.config_flags }}
-
-      - name: Install
-        env:
-          CXX: ${{ matrix.cxx }}
-          F77: ${{ matrix.f77 }}
-        run: make install
-
-      - name: Fix dylib names
-        if: matrix.runs_on == 'macos-11' || matrix.runs_on == 'macos-12'
         run: |
+          ./bootstrap 
+          ./configure --prefix=$PWD ${{ matrix.config_flags }}
+          make install
+
+      - name: Run Bootstrap, Configure and install (MacOS)
+        env:
+          CC:  ${{ env.CC }}
+          CXX: ${{ env.CXX }}
+          FC:  ${{ env.FC }}
+          F77: ${{ env.F77 }}
+          CFLAGS:   ${{ env.CFLAGS }}
+          CXXFLAGS: ${{ env.CXXFLAGS }}
+          FFLAGS:   ${{ env.FFLAGS }}
+          LDFLAGS:  ${{ env.LDFLAGS }}
+        run: |
+          ./bootstrap 
+          ./configure --prefix=$PWD ${{ matrix.config_flags }}
+          make install
+
+      - name: Manage dependence libraries (MacOS; fix dylib names)
+        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
+        run: |
+          set -eux
           cd lib
+
+          # 拷贝 gfortran/quadmath/gcc_s/stdc++ 动态库
+          copy_one() {
+            local name="$1"
+            local p="$($FC -print-file-name=$name || true)"
+            [ -f "$p" ] && cp -v "$p" . || true
+          }
+          copy_one libgfortran.dylib
+          copy_one libquadmath.dylib
+          copy_one libgcc_s.1.1.dylib
+
+          # libstdc++ 由 g++ 提供（有时路径不同，逐一尝试）
+          STDCPP="$($CXX -print-file-name=libstdc++.6.dylib || true)"
+          [ -f "$STDCPP" ] && cp -v "$STDCPP" . || true
+
+          # 用 @rpath/@loader_path 修正 install_name，避免硬编码到 Homebrew 路径
+          fix_id() { [ -f "$1" ] && install_name_tool -id "@rpath/$1" "$1" || true ; }
+          fix_id libgfortran.dylib
+          fix_id libquadmath.dylib
+          fix_id libgcc_s.1.1.dylib
+          fix_id libstdc++.6.dylib
+
+          # 你的主库名按实际调整（示例：libsme.dylib / libsme.5.dylib）
+          for target in libsme.dylib libsme.5.dylib; do
+            [ -f "$target" ] || continue
+            install_name_tool -id "@rpath/$target" "$target" || true
+            for dep in libgfortran.dylib libquadmath.dylib libgcc_s.1.1.dylib libstdc++.6.dylib; do
+              [ -f "$dep" ] || continue
+              # 将对 Homebrew 绝对路径的引用改到随包的相对位置
+              install_name_tool -change "$(otool -L "$target" | awk '/'"$dep"'/ {print $1}')" "@loader_path/$dep" "$target" || true
+            done
+            otool -L "$target" || true
+          done
+
+
           install_name_tool -id $PWD/libsme.dylib libsme.dylib
           install_name_tool -id $PWD/libsme.5.dylib libsme.5.dylib
           install_name_tool -id $PWD/sme_synth.so.darwin.x86_64.64 sme_synth.so.darwin.x86_64.64
 
-      - name: Copy libgfortran
+      - name: Manage dependence libraries (Ubuntu; copy libgfortran)
         if: matrix.name == 'ubuntu-gfortran'
         run: |
           make -s flib_source
