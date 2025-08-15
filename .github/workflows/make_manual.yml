@@ -341,6 +341,7 @@ jobs:
           path: ./debug_radiative_transfer.npz
 
       - name: Upload Release Asset
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
