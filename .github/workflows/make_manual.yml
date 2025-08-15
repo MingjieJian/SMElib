@@ -305,7 +305,7 @@ jobs:
           cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
 
       - name: Copy libgfortran
-        if: matrix.runs_on == 'macos-11' || matrix.runs_on == 'macos-12'
+        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
         run: |
           make -s flib_source
           make -s flib_target
@@ -329,7 +329,7 @@ jobs:
           path: ${{ matrix.name }}.zip
 
       - name: Prepare Test Environment (MacOS)
-        if: matrix.name != 'windows-gfortran' && matrix.name != 'windows-f2c'
+        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
         run: |
           python -m pip install -U pip setuptools wheel
           pip3 install -r test/requirements.txt
@@ -337,7 +337,7 @@ jobs:
           python3 setup.py build_ext --inplace
         
       - name: Prepare Test Environment (Others)
-        if: matrix.name != 'windows-gfortran' && matrix.name != 'windows-f2c'
+        if: matrix.name != 'windows-gfortran' && matrix.runs_on != 'macos-13' && matrix.runs_on != 'macos-15'
         run: |
           pip3 install -r test/requirements.txt
           cd pymodule
