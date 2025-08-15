@@ -227,6 +227,7 @@ jobs:
           mv ${{ matrix.makefile }} Makefile.am
 
       - name: Run Bootstrap, Configure and install (Ubuntu)
+        if: matrix.runs_on == 'ubuntu-latest'
         env:
           CXX: ${{ matrix.cxx }}
           F77: ${{ matrix.f77 }}
@@ -236,6 +237,7 @@ jobs:
           make install
 
       - name: Run Bootstrap, Configure and install (MacOS)
+        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
         env:
           CC:  ${{ env.CC }}
           CXX: ${{ env.CXX }}

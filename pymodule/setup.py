@@ -3,7 +3,7 @@ from distutils.core import setup, Extension
 import numpy as np
 
 libdir = abspath(join(dirname(__file__), "../lib"))
-include_dirs = np.get_include()
+include_dirs = [np.get_include()]
 include_dirs += [libdir]
 
 module = Extension(
