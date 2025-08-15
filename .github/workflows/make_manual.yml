@@ -1,4 +1,4 @@
-name: make
+name: make-manual
 
 permissions:
   contents: write

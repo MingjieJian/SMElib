@@ -1,17 +1,6 @@
 name: make
 
-on:
-  push:
-    branches: [master]
-  workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Upload to GitHub Release?'
-        required: false
-        default: 'false'   # 手动触发默认不发布
-        type: choice
-        options: ['false','true']
-        
+on: [push]
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
