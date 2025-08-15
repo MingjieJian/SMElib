@@ -231,7 +231,6 @@ jobs:
           ./bootstrap 
           ./configure --prefix=$PWD ${{ matrix.config_flags }}
           make install
-          ls lib/
 
       - name: Run Bootstrap, Configure and install (MacOS)
         if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
@@ -248,6 +247,7 @@ jobs:
           ./bootstrap 
           ./configure --prefix=$PWD ${{ matrix.config_flags }}
           make install
+          ls lib
 
       - name: Manage dependence libraries (MacOS; fix dylib names)
         if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
