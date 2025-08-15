@@ -288,7 +288,6 @@ jobs:
             otool -L "$target" || true
           done
 
-
           install_name_tool -id $PWD/libsme.dylib libsme.dylib
           install_name_tool -id $PWD/libsme.5.dylib libsme.5.dylib
           if [ "${{ matrix.arch }}" = "x86_64" ]; then
@@ -304,15 +303,36 @@ jobs:
           make -s flib_target
           cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
 
-      - name: Copy libgfortran
-        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
+      - name: Copy libgfortran (MacOS)
+        if: startsWith(matrix.runs_on, 'macos-')
+        shell: bash
         run: |
-          make -s flib_source
-          make -s flib_target
-          cp -v $(dirname $(make -s flib_source))/$(readlink $(make -s flib_source)) $(make -s flib_target)
+          set -eux
+
+          mkdir -p lib
+          chmod -R u+w lib || true
+
+          # 取 libgfortran 的实际文件（可能是 symlink，解析成真实路径）
+          gflib="$(gfortran -print-file-name=libgfortran.dylib)"
+          real_gflib="$(python3 - <<'PY'
+          import os,sys
+          p=os.path.realpath(sys.argv[1])
+          print(p)
+          PY
+          "$gflib")"
+
+          # 可能有带版本号的变体（例如 libgfortran.5.dylib）
+          base="$(basename "$real_gflib")"
+
+          # 确保能覆盖旧文件
+          rm -f "lib/$base" "lib/libgfortran.dylib"
+
+          # 拷贝并建立一个无版本号的软链，便于 install_name_tool 统一引用
+          cp -v "$real_gflib" "lib/$base"
+          ln -svf "$base" "lib/libgfortran.dylib"
 
 
-      - name: Copy libgfortran
+      - name: Copy libgfortran (Windows)
         if: matrix.name == 'windows-gfortran'
         run: |
           ls $(x86_64-w64-mingw32-gfortran --print-file-name=)libgfortran-?.dll
