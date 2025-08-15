@@ -303,15 +303,6 @@ jobs:
           make -s flib_target
           cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
 
-      # - name: Copy libgfortran (MacOS)
-      #   if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
-      #   run: |
-      #     make -s flib_source
-      #     make -s flib_target
-      #     ls flib_target
-      #     cp -v $(dirname $(make -s flib_source))/$(readlink $(make -s flib_source)) $(make -s flib_target)
-
-
       - name: Copy libgfortran (Windows)
         if: matrix.name == 'windows-gfortran'
         run: |
@@ -328,23 +319,28 @@ jobs:
           name: library-${{ matrix.name }}
           path: ${{ matrix.name }}.zip
 
-      - name: Prepare Test Environment (MacOS)
-        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
-        run: |
-          python -m pip install -U pip setuptools wheel
-          pip3 install -r test/requirements.txt
-          cd pymodule
-          python3 setup.py build_ext --inplace
+      # - name: Test Library (MacOS)
+      #   if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
+      #   run: |
+      #     python3 -m venv .venv
+      #     . .venv/bin/activate
+      #     python -m pip install -r test/requirements.txt
+      #     cd pymodule
+      #     python setup.py build_ext --inplace
+      #     python -m pytest
         
-      - name: Prepare Test Environment (Others)
-        if: matrix.name != 'windows-gfortran' && matrix.runs_on != 'macos-13' && matrix.runs_on != 'macos-15'
+      - name: Test Library (Others)
+        if: matrix.name != 'windows-gfortran' # && matrix.runs_on != 'macos-13' && matrix.runs_on != 'macos-15'
         run: |
-          pip3 install -r test/requirements.txt
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -r test/requirements.txt
           cd pymodule
-          python3 setup.py build_ext --inplace
+          python setup.py build_ext --inplace
+          python -m pytest
 
       - name: Test Library
-        if: matrix.name != 'windows-gfortran' && matrix.name != 'windows-f2c'
+        if: matrix.name != 'windows-gfortran'
         run: python3 -m pytest
 
       - name: Upload Debug Spectrum
