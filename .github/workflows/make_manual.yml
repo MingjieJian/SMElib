@@ -303,13 +303,13 @@ jobs:
           make -s flib_target
           cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
 
-      - name: Copy libgfortran (MacOS)
-        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
-        run: |
-          make -s flib_source
-          make -s flib_target
-          ls flib_target
-          cp -v $(dirname $(make -s flib_source))/$(readlink $(make -s flib_source)) $(make -s flib_target)
+      # - name: Copy libgfortran (MacOS)
+      #   if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
+      #   run: |
+      #     make -s flib_source
+      #     make -s flib_target
+      #     ls flib_target
+      #     cp -v $(dirname $(make -s flib_source))/$(readlink $(make -s flib_source)) $(make -s flib_target)
 
 
       - name: Copy libgfortran (Windows)
