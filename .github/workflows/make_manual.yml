@@ -244,9 +244,12 @@ jobs:
           FFLAGS:   ${{ env.FFLAGS }}
           LDFLAGS:  ${{ env.LDFLAGS }}
         run: |
-          ./bootstrap 
+          ./bootstrap
           ./configure --prefix=$PWD ${{ matrix.config_flags }}
           make install
+          if [ -f sme_synth.so.darwin.aarch64.64 ]; then
+            mv -v sme_synth.so.darwin.aarch64.64 sme_synth.so.darwin.arm64.64
+          fi
           ls lib
 
       - name: Manage dependence libraries (MacOS; fix dylib names)
