@@ -247,8 +247,9 @@ jobs:
           ./bootstrap
           ./configure --prefix=$PWD ${{ matrix.config_flags }}
           make install
-          if [ -f sme_synth.so.darwin.aarch64.64 ]; then
-            mv -v sme_synth.so.darwin.aarch64.64 sme_synth.so.darwin.arm64.64
+          if [ -f lib/sme_synth.so.darwin.aarch64.64 ]; then
+            echo 'Moving aarch to arm'
+            mv -v lib/sme_synth.so.darwin.aarch64.64 lib/sme_synth.so.darwin.arm64.64
           fi
           ls lib
 
