@@ -328,7 +328,15 @@ jobs:
           name: library-${{ matrix.name }}
           path: ${{ matrix.name }}.zip
 
-      - name: Prepare Test Environment
+      - name: Prepare Test Environment (MacOS)
+        if: matrix.name != 'windows-gfortran' && matrix.name != 'windows-f2c'
+        run: |
+          python -m pip install -U pip setuptools wheel
+          pip3 install -r test/requirements.txt
+          cd pymodule
+          python3 setup.py build_ext --inplace
+        
+      - name: Prepare Test Environment (Others)
         if: matrix.name != 'windows-gfortran' && matrix.name != 'windows-f2c'
         run: |
           pip3 install -r test/requirements.txt
