@@ -291,7 +291,11 @@ jobs:
 
           install_name_tool -id $PWD/libsme.dylib libsme.dylib
           install_name_tool -id $PWD/libsme.5.dylib libsme.5.dylib
-          install_name_tool -id $PWD/sme_synth.so.darwin.x86_64.64 sme_synth.so.darwin.x86_64.64
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            install_name_tool -id $PWD/sme_synth.so.darwin.x86_64.64 sme_synth.so.darwin.x86_64.64
+          else
+            install_name_tool -id $PWD/sme_synth.so.darwin.aarch64.64 sme_synth.so.darwin.aarch64.64
+          fi
 
       - name: Manage dependence libraries (Ubuntu; copy libgfortran)
         if: matrix.name == 'ubuntu-gfortran'
