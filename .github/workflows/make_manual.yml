@@ -159,16 +159,12 @@ jobs:
             runs_on: macos-13
             arch: x86_64
             packages: automake libtool gcc
-            # cxx: gcc-9
-            # f77: gfortran-9
             outputs: lib share
             makefile: Makefile.am
           - name: macos-arm64-gfortran
             runs_on: macos-15
             arch: arm64
             packages: automake libtool gcc
-            # cxx: gcc-11
-            # f77: gfortran-11
             outputs: lib share
             makefile: Makefile.am
 
