@@ -339,11 +339,12 @@ jobs:
           python -m pip install -r test/requirements.txt
           cd pymodule
           python setup.py build_ext --inplace
+          cd ..
           python -m pytest
 
-      - name: Test Library
-        if: matrix.name != 'windows-gfortran'
-        run: python3 -m pytest
+      # - name: Test Library
+      #   if: matrix.name != 'windows-gfortran'
+      #   run: python3 -m pytest
 
       - name: Upload Debug Spectrum
         uses: actions/upload-artifact@v4
