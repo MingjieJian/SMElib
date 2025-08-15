@@ -297,7 +297,7 @@ jobs:
           if [ "${{ matrix.arch }}" = "x86_64" ]; then
             install_name_tool -id $PWD/sme_synth.so.darwin.x86_64.64 sme_synth.so.darwin.x86_64.64
           else
-            install_name_tool -id $PWD/sme_synth.so.darwin.aarch64.64 sme_synth.so.darwin.aarch64.64
+            install_name_tool -id $PWD/sme_synth.so.darwin.arm64.64 sme_synth.so.darwin.arm64.64
           fi
 
       - name: Manage dependence libraries (Ubuntu; copy libgfortran)
