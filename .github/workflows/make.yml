@@ -6,6 +6,8 @@ permissions:
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
     inputs:
       publish:
@@ -308,7 +310,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: GitHub Tag
         id: tag_release
-        # You may pin to the exact commit or the version.
+        # You may pin to the exact commit or the version.·
         # uses: mathieudutour/github-tag-action@1bab3ab0712cafa42b54c512453487b89bb06504
         uses: mathieudutour/github-tag-action@v6.1
         with:
