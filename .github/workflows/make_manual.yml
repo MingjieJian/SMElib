@@ -118,7 +118,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.container }}-${{ matrix.name }}          
+          name: ${{ matrix.name }}          
           path: |
             ./*.zip
             ./debug_radiative_transfer.npz
