@@ -215,28 +215,81 @@ jobs:
 
           otool -L libsme.dylib
 
-          # 拷贝 gfortran/quadmath/gcc_s/stdc++ 动态库
-          copy_one() {
-            local name="$1"
-            local p="$($FC -print-file-name=$name || true)"
-            [ -f "$p" ] && cp -v "$p" . || true
+          # 这些依赖随包一起带
+          need_deps=(libgfortran.5.dylib libquadmath.0.dylib libstdc++.6.dylib libgcc_s.1.1.dylib)
+
+          # 1) 尽量从编译器位置把依赖拷到当前目录
+          copy_from_cc() {  # $1=命令($FC/$CXX), $2=库名
+            local p
+            p="$($1 -print-file-name=$2 2>/dev/null || true)"
+            [ -n "$p" ] && [ -f "$p" ] && cp -v "$p" . || true
           }
-          copy_one libgfortran.5.dylib
-          copy_one libgfortran.dylib
-          copy_one libquadmath.dylib
-          copy_one libgcc_s.1.1.dylib
+          copy_from_cc "$FC"  libgfortran.5.dylib || copy_from_cc "$FC"  libgfortran.dylib
+          copy_from_cc "$FC"  libquadmath.0.dylib || copy_from_cc "$FC"  libquadmath.dylib
+          copy_from_cc "$CXX" libstdc++.6.dylib
+          copy_from_cc "$FC"  libgcc_s.1.1.dylib
 
-          # libstdc++ 由 g++ 提供（有时路径不同，逐一尝试）
-          STDCPP="$($CXX -print-file-name=libstdc++.6.dylib || true)"
-          [ -f "$STDCPP" ] && cp -v "$STDCPP" . || true
+          # 若只有无版本号的 gfortran，补个软链（更推荐拿到真的 .5）
+          [ -f libgfortran.5.dylib ] || { [ -f libgfortran.dylib ] && ln -sf libgfortran.dylib libgfortran.5.dylib; }
 
-          # 用 @rpath/@loader_path 修正 install_name，避免硬编码到 Homebrew 路径
-          fix_id() { [ -f "$1" ] && install_name_tool -id "@rpath/$1" "$1" || true ; }
-          fix_id libgfortran.5.dylib
-          fix_id libgfortran.dylib
-          fix_id libquadmath.dylib
-          fix_id libgcc_s.1.1.dylib
-          fix_id libstdc++.6.dylib
+          # 2) 把这些依赖库自身的 id 设为相对路径
+          for d in "${need_deps[@]}"; do
+            [ -f "$d" ] && install_name_tool -id "@loader_path/$d" "$d" || true
+          done
+
+          # 3) 针对每个目标，把“旧路径”自动查出后改为 @loader_path/xxx
+          fix_dep() {  # $1=target, $2=库名(含版本)
+            local tgt="$1" dep="$2" repl="@loader_path/$2" old
+            [ -f "$tgt" ] || return 0
+            old="$(otool -L "$tgt" | awk -v d="$dep" '$1 ~ d {print $1; exit}')"
+            [ -n "$old" ] && install_name_tool -change "$old" "$repl" "$tgt" || true
+          }
+
+          for T in libsme.dylib libsme.5.dylib sme_synth.so.darwin.*; do
+            fix_dep "$T" libgfortran.5.dylib
+            fix_dep "$T" libquadmath.0.dylib
+            fix_dep "$T" libstdc++.6.dylib
+            fix_dep "$T" libgcc_s.1.1.dylib
+          done
+
+          for old in \
+            "$($CXX -print-file-name=libstdc++.6.dylib 2>/dev/null || true)" \
+            /opt/homebrew/opt/gcc/lib/gcc/current/libstdc++.6.dylib \
+            /usr/local/opt/gcc/lib/gcc/current/libstdc++.6.dylib
+          do
+            [ -n "$old" ] && install_name_tool -change "$old" "@loader_path/libstdc++.6.dylib" libsme.dylib || true
+          done
+
+          # libgfortran 可能还依赖 quadmath/gcc_s，也一并改
+          fix_dep libgfortran.5.dylib libquadmath.0.dylib
+          fix_dep libgfortran.5.dylib libgcc_s.1.1.dylib
+
+          # 4) 验证：不应再出现 /opt/homebrew 或 /usr/local/opt
+          echo "== deps of libsme.dylib ==" && otool -L libsme.dylib
+          otool -L libsme.dylib | grep -E '(/opt/homebrew|/usr/local/opt)' && { echo "!! still absolute path"; exit 1; } || true
+
+          # # 拷贝 gfortran/quadmath/gcc_s/stdc++ 动态库
+          # copy_one() {
+          #   local name="$1"
+          #   local p="$($FC -print-file-name=$name || true)"
+          #   [ -f "$p" ] && cp -v "$p" . || true
+          # }
+          # copy_one libgfortran.5.dylib
+          # copy_one libgfortran.dylib
+          # copy_one libquadmath.dylib
+          # copy_one libgcc_s.1.1.dylib
+
+          # # libstdc++ 由 g++ 提供（有时路径不同，逐一尝试）
+          # STDCPP="$($CXX -print-file-name=libstdc++.6.dylib || true)"
+          # [ -f "$STDCPP" ] && cp -v "$STDCPP" . || true
+
+          # # 用 @rpath/@loader_path 修正 install_name，避免硬编码到 Homebrew 路径
+          # fix_id() { [ -f "$1" ] && install_name_tool -id "@rpath/$1" "$1" || true ; }
+          # fix_id libgfortran.5.dylib
+          # fix_id libgfortran.dylib
+          # fix_id libquadmath.dylib
+          # fix_id libgcc_s.1.1.dylib
+          # fix_id libstdc++.6.dylib
 
           # 你的主库名按实际调整（示例：libsme.dylib / libsme.5.dylib）
           for target in libsme.dylib libsme.5.dylib; do
@@ -359,5 +412,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create_release.outputs.tag }}
-          prerelease: ${{ github.ref_name == 'master' }}
+          prerelease: ${{ github.ref_name != 'master' }}
           files: dist/*.zip
