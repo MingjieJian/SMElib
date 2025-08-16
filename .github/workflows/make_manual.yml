@@ -64,33 +64,50 @@ jobs:
       image: quay.io/pypa/${{ matrix.container }}
 
     steps:
-      - run: yum install -y zip python3-pip python3-devel
-      - run: git clone https://github.com/MingjieJian/SMElib .
+      - uses: actions/checkout@v4
 
-      - name: Replace Makefile
-        if: matrix.makefile != 'Makefile.am'
-        run: rm Makefile.am && mv ${{ matrix.makefile }} Makefile.am
-       
-      - run: ./bootstrap && ./configure --prefix=$PWD
-      - run: make install
+      - name: Build & test inside manylinux
+        uses: addnab/docker-run-action@v3
+        with:
+          image: quay.io/pypa/${{ matrix.container }}
+          options: -v ${{ github.workspace }}:/work -w /work
+          run: |
+            set -eux
+            yum install -y zip python3-pip python3-devel
+            git clone https://github.com/MingjieJian/SMElib .
+            
+            # Replace Makefile (optinal)
+            if [ "${{ matrix.makefile }}" != "Makefile.am" ]; then
+              rm -f Makefile.am 
+              mv "${{ matrix.makefile }}" Makefile.am
+            fi
+            ./bootstrap
+            ./configure --prefix=$PWD
+            make install
+            
+            # Copy libgfortran
+            if [ "${{ matrix.compiler }}" = "gfortran" ]; then
+              make -s flib_target
+              cp -v "$(readlink -f "$(make -s flib_source)")" "$(make -s flib_target)"
+            fi
+            ls -l lib
+            zip -r "${{ matrix.container }}-${{ matrix.name }}.zip" lib share
+            
+            # Install Requirements
+            pip3 install -r test/requirements.txt
+            cd pymodule
+            python3 setup.py build_ext --inplace
+            python3 -m pytest
 
-      - name: Copy libgfortran
-        if: matrix.compiler == 'gfortran'
-        run: |
-          ls -l $(dirname $(make -s flib_source))
-          make -s flib_target
-          cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
+      # - name: Copy libgfortran
+      #   if: matrix.compiler == 'gfortran'
+      #   run: |
+      #     ls -l $(dirname $(make -s flib_source))
+      #     make -s flib_target
+      #     cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
 
-      - run: ls lib
-      - run: zip -r ${{ matrix.container }}-${{ matrix.name }} lib share
-
-      - name: Install Requirements
-        run: |
-          pip3 install -r test/requirements.txt
-          cd pymodule
-          python3 setup.py build_ext --inplace
-
-      - run: python3 -m pytest
+      # - run: ls lib
+      # - run: zip -r ${{ matrix.container }}-${{ matrix.name }} lib share
 
       # - name: Upload Debug Spectrum
       #   uses: actions/upload-artifact@v4
@@ -101,7 +118,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.container }}-${{ matrix.name }}          
           path: |
             ./*.zip
             ./debug_radiative_transfer.npz
