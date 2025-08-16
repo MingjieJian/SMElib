@@ -355,5 +355,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create_release.outputs.tag }}
-          prerelease: true
+          prerelease: ${{ github.ref_name == 'master' }}
           files: dist/*.zip
