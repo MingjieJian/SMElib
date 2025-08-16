@@ -242,8 +242,6 @@ jobs:
             local tgt="$1" dep="$2" repl="@loader_path/$2" old
             [ -f "$tgt" ] || return 0
             old="$(otool -L "$tgt" | awk -v d="$dep" '$1 ~ d {print $1; exit}')"
-            echo "==========="
-            echo $old
             [ -n "$old" ] && install_name_tool -change "$old" "$repl" "$tgt" || true
           }
 
@@ -252,6 +250,14 @@ jobs:
             fix_dep "$T" libquadmath.0.dylib
             fix_dep "$T" libstdc++.6.dylib
             fix_dep "$T" libgcc_s.1.1.dylib
+          done
+
+          for old in \
+            "$($CXX -print-file-name=libstdc++.6.dylib 2>/dev/null || true)" \
+            /opt/homebrew/opt/gcc/lib/gcc/current/libstdc++.6.dylib \
+            /usr/local/opt/gcc/lib/gcc/current/libstdc++.6.dylib
+          do
+            [ -n "$old" ] && install_name_tool -change "$old" "@loader_path/libstdc++.6.dylib" libsme.dylib || true
           done
 
           # libgfortran 可能还依赖 quadmath/gcc_s，也一并改
