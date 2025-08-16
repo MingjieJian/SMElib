@@ -45,37 +45,34 @@ jobs:
           MAKEFILE: ${{ matrix.makefile }}
           COMPILER: ${{ matrix.compiler }}
           OUT_ZIP: ${{ matrix.container }}-${{ matrix.name }}.zip
-        with:
-          image: quay.io/pypa/${{ matrix.container }}
-          options: -v ${{ github.workspace }}:/work -w /work
-          run: |
+        run: |
+          set -eux
+          docker pull "$DOCKER_IMAGE"
+          docker run --rm \
+          -v "$GITHUB_WORKSPACE":/work -w /work \
+          "$DOCKER_IMAGE" \
+          bash -lc '
             set -eux
-            docker pull "$DOCKER_IMAGE"
-            docker run --rm \
-            -v "$GITHUB_WORKSPACE":/work -w /work \
-            "$DOCKER_IMAGE" \
-            bash -lc '
-              set -eux
-              yum install -y zip python3-pip python3-devel
-              # git clone https://github.com/MingjieJian/SMElib .
-              
-              # Replace Makefile (optinal)
-              if [ "${{ matrix.makefile }}" != "Makefile.am" ]; then
-                rm -f Makefile.am 
-                mv "${{ matrix.makefile }}" Makefile.am
-              fi
-              ./bootstrap
-              ./configure --prefix=$PWD
-              make install
-              
-              # Copy libgfortran
-              if [ "${{ matrix.compiler }}" = "gfortran" ]; then
-                make -s flib_target
-                cp -v "$(readlink -f "$(make -s flib_source)")" "$(make -s flib_target)"
-              fi
-              ls -l lib
-              zip -r "${{ matrix.container }}-${{ matrix.name }}.zip" lib share
-            '
+            yum install -y zip python3-pip python3-devel
+            # git clone https://github.com/MingjieJian/SMElib .
+            
+            # Replace Makefile (optinal)
+            if [ "${{ matrix.makefile }}" != "Makefile.am" ]; then
+              rm -f Makefile.am 
+              mv "${{ matrix.makefile }}" Makefile.am
+            fi
+            ./bootstrap
+            ./configure --prefix=$PWD
+            make install
+            
+            # Copy libgfortran
+            if [ "${{ matrix.compiler }}" = "gfortran" ]; then
+              make -s flib_target
+              cp -v "$(readlink -f "$(make -s flib_source)")" "$(make -s flib_target)"
+            fi
+            ls -l lib
+            zip -r "${{ matrix.container }}-${{ matrix.name }}.zip" lib share
+          '
 
       - name: Test library
         run: |
