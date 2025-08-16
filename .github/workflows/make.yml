@@ -242,6 +242,8 @@ jobs:
             local tgt="$1" dep="$2" repl="@loader_path/$2" old
             [ -f "$tgt" ] || return 0
             old="$(otool -L "$tgt" | awk -v d="$dep" '$1 ~ d {print $1; exit}')"
+            echo "==========="
+            echo $old
             [ -n "$old" ] && install_name_tool -change "$old" "$repl" "$tgt" || true
           }
 
