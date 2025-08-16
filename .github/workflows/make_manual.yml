@@ -92,13 +92,14 @@ jobs:
             fi
             ls -l lib
             zip -r "${{ matrix.container }}-${{ matrix.name }}.zip" lib share
-            
+
       - name: Pytest
         run: |
             pip3 install -r test/requirements.txt
             cd pymodule
-            python3 setup.py build_ext --inplace
-            python3 -m pytest
+            python setup.py build_ext --inplace
+            cd ..
+            python -m pytest
 
       # - name: Copy libgfortran
       #   if: matrix.compiler == 'gfortran'
