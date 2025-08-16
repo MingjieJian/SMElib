@@ -92,11 +92,11 @@ jobs:
 
       - run: python3 -m pytest
 
-      - name: Upload Debug Spectrum
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug_radiative_transfer_${{ matrix.container }}-${{ matrix.name }}.npz
-          path: ./debug_radiative_transfer.npz
+      # - name: Upload Debug Spectrum
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: debug_radiative_transfer_${{ matrix.container }}-${{ matrix.name }}.npz
+      #     path: ./debug_radiative_transfer.npz
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -318,15 +318,15 @@ jobs:
           cd ..
           python -m pytest
 
-      - name: Test Library
-        if: matrix.name != 'windows-gfortran'
-        run: python3 -m pytest
+      # - name: Test Library
+      #   if: matrix.name != 'windows-gfortran'
+      #   run: python3 -m pytest
 
-      # - name: Upload Debug Spectrum
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: debug_radiative_transfer_${{matrix.name}}.npz
-      #     path: ./debug_radiative_transfer.npz
+      - name: Upload Debug Spectrum
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug_radiative_transfer_${{matrix.name}}.npz
+          path: ./debug_radiative_transfer.npz
 
       - name: Upload Release Asset
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
