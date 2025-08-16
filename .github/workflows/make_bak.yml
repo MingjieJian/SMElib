@@ -1,33 +1,19 @@
-name: make-manual
-
-permissions:
-  contents: write
+name: make-bak
 
 on:
   push:
-    branches: [master]
-  workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Upload to GitHub Release?'
-        required: false
-        default: 'false'   # 手动触发默认不发布
-        type: choice
-        options: ['false','true']
-        
+    branches:
+      - dummy
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
 
 jobs:
   create_release:
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      tag: ${{ steps.tag_release.outputs.new_tag }}
     steps:
-      - uses: actions/checkout@v4
       - name: GitHub Tag
         id: tag_release
         # You may pin to the exact commit or the version.
@@ -51,7 +37,7 @@ jobs:
           prerelease: false
 
   manylinux-build:
-    # needs: [create_release]
+    needs: [create_release]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -61,88 +47,77 @@ jobs:
             container: manylinux2014_x86_64
             compiler: gfortran
             makefile: Makefile.am
+          # - name: gfortran-parallel
+          #   container: manylinux2014_x86_64
+          #   compiler: gfortran
+          #   makefile: Makefile_parallel.am
+          # F2C fails the test on manylinux for some reason , f2c]
 
-    # container:
-    #   image: quay.io/pypa/${{ matrix.container }}
+    container:
+      image: quay.io/pypa/${{ matrix.container }}
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Build & test inside manylinux
-        uses: addnab/docker-run-action@v3
-        with:
-          image: quay.io/pypa/${{ matrix.container }}
-          options: -v ${{ github.workspace }}:/work -w /work
-          run: |
-            set -eux
-            yum install -y zip python3-pip python3-devel
-            # git clone https://github.com/MingjieJian/SMElib .
-            
-            # Replace Makefile (optinal)
-            if [ "${{ matrix.makefile }}" != "Makefile.am" ]; then
-              rm -f Makefile.am 
-              mv "${{ matrix.makefile }}" Makefile.am
-            fi
-            ./bootstrap
-            ./configure --prefix=$PWD
-            make install
-            
-            # Copy libgfortran
-            if [ "${{ matrix.compiler }}" = "gfortran" ]; then
-              make -s flib_target
-              cp -v "$(readlink -f "$(make -s flib_source)")" "$(make -s flib_target)"
-            fi
-            ls -l lib
-            zip -r "${{ matrix.container }}-${{ matrix.name }}.zip" lib share
-
-      - name: Test library
+      - run: yum install -y zip python3-pip python3-devel
+      - run: git clone https://github.com/MingjieJian/SMElib .
+      - name: Install F2C & Compile libf2c.a
+        if: matrix.compiler == 'f2c'
         run: |
-            pip3 install -r test/requirements.txt
-            cd pymodule
-            python setup.py build_ext --inplace
-            cd ..
-            python -m pytest
+          yum install -y f2c wget
+          cd libf2c
+          wget https://www.netlib.org/f2c/libf2c.zip
+          unzip libf2c.zip -d f2c
+          cd f2c
+          cp ../makefile.u Makefile
+          make
+          cp libf2c.a /usr/local/lib/
+          cd ../..
+      - name: Replace Makefile
+        if: matrix.makefile != 'Makefile.am'
+        run: rm Makefile.am && mv ${{ matrix.makefile }} Makefile.am
+      - name: Run F2C
+        if: matrix.compiler == 'f2c'
+        run: f2c -w -a -C++ -Nn1604 -Nq1200 -dsrc/eos/ src/eos/*.f & f2c -w -a -C++ -dsrc/sme/ src/sme/*.f
+  
+      - run: ./bootstrap && ./configure --prefix=$PWD
+      - run: make install
 
-      # - name: Copy libgfortran
-      #   if: matrix.compiler == 'gfortran'
-      #   run: |
-      #     ls -l $(dirname $(make -s flib_source))
-      #     make -s flib_target
-      #     cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
+      - name: Copy libgfortran
+        if: matrix.compiler == 'gfortran'
+        run: |
+          ls -l $(dirname $(make -s flib_source))
+          make -s flib_target
+          cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
 
-      # - run: ls lib
-      # - run: zip -r ${{ matrix.container }}-${{ matrix.name }} lib share
+      - run: ls lib
+      - run: zip -r ${{ matrix.container }}-${{ matrix.name }} lib share
 
-      # - name: Upload Debug Spectrum
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: debug_radiative_transfer_${{ matrix.container }}-${{ matrix.name }}.npz
-      #     path: ./debug_radiative_transfer.npz
+      - name: Install Requirements
+        run: |
+          pip3 install -r test/requirements.txt
+          cd pymodule
+          python3 setup.py build_ext --inplace
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - run: python3 -m pytest
+
+      - name: Upload Debug Spectrum
+        uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.name }}          
-          path: |
-            ./*.zip
-            ./debug_radiative_transfer.npz
-            ./sme_synth.stdout.txt
-            ./sme_synth.params
-          if-no-files-found: ignore
+          name: debug_radiative_transfer_${{ matrix.container }}-${{ matrix.name }}.npz
+          path: ./debug_radiative_transfer.npz
 
-      # - name: Upload Release Asset
-      #   if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
-      #   id: upload-release-asset
-      #   uses: actions/upload-release-asset@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ needs.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-      #     asset_path: ./${{ matrix.name }}.zip
-      #     asset_name: ${{ matrix.name }}.zip
-      #     asset_content_type: application/zip
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./${{ matrix.container }}-${{ matrix.name }}.zip
+          asset_name: ${{ matrix.container }}-${{ matrix.name }}.zip
+          asset_content_type: application/zip
 
   build:
+    needs: create_release
     strategy:
       fail-fast: false
       matrix:
@@ -164,12 +139,16 @@ jobs:
             runs_on: macos-13
             arch: x86_64
             packages: automake libtool gcc
+            # cxx: gcc-9
+            # f77: gfortran-9
             outputs: lib share
             makefile: Makefile.am
           - name: macos-arm64-gfortran
             runs_on: macos-15
             arch: arm64
             packages: automake libtool gcc
+            # cxx: gcc-11
+            # f77: gfortran-11
             outputs: lib share
             makefile: Makefile.am
 
@@ -228,7 +207,6 @@ jobs:
           mv ${{ matrix.makefile }} Makefile.am
 
       - name: Run Bootstrap, Configure and install (Ubuntu)
-        if: matrix.runs_on == 'ubuntu-latest'
         env:
           CXX: ${{ matrix.cxx }}
           F77: ${{ matrix.f77 }}
@@ -238,7 +216,6 @@ jobs:
           make install
 
       - name: Run Bootstrap, Configure and install (MacOS)
-        if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
         env:
           CC:  ${{ env.CC }}
           CXX: ${{ env.CXX }}
@@ -249,14 +226,9 @@ jobs:
           FFLAGS:   ${{ env.FFLAGS }}
           LDFLAGS:  ${{ env.LDFLAGS }}
         run: |
-          ./bootstrap
+          ./bootstrap 
           ./configure --prefix=$PWD ${{ matrix.config_flags }}
           make install
-          if [ -f lib/sme_synth.so.darwin.aarch64.64 ]; then
-            echo 'Moving aarch to arm'
-            mv -v lib/sme_synth.so.darwin.aarch64.64 lib/sme_synth.so.darwin.arm64.64
-          fi
-          ls lib
 
       - name: Manage dependence libraries (MacOS; fix dylib names)
         if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
@@ -297,13 +269,10 @@ jobs:
             otool -L "$target" || true
           done
 
+
           install_name_tool -id $PWD/libsme.dylib libsme.dylib
           install_name_tool -id $PWD/libsme.5.dylib libsme.5.dylib
-          if [ "${{ matrix.arch }}" = "x86_64" ]; then
-            install_name_tool -id $PWD/sme_synth.so.darwin.x86_64.64 sme_synth.so.darwin.x86_64.64
-          else
-            install_name_tool -id $PWD/sme_synth.so.darwin.arm64.64 sme_synth.so.darwin.arm64.64
-          fi
+          install_name_tool -id $PWD/sme_synth.so.darwin.x86_64.64 sme_synth.so.darwin.x86_64.64
 
       - name: Manage dependence libraries (Ubuntu; copy libgfortran)
         if: matrix.name == 'ubuntu-gfortran'
@@ -312,7 +281,15 @@ jobs:
           make -s flib_target
           cp -v $(readlink -f $(make -s flib_source)) $(make -s flib_target)
 
-      - name: Copy libgfortran (Windows)
+      - name: Copy libgfortran
+        if: matrix.runs_on == 'macos-11' || matrix.runs_on == 'macos-12'
+        run: |
+          make -s flib_source
+          make -s flib_target
+          cp -v $(dirname $(make -s flib_source))/$(readlink $(make -s flib_source)) $(make -s flib_target)
+
+
+      - name: Copy libgfortran
         if: matrix.name == 'windows-gfortran'
         run: |
           ls $(x86_64-w64-mingw32-gfortran --print-file-name=)libgfortran-?.dll
@@ -323,82 +300,35 @@ jobs:
         run: zip -r ${{ matrix.name }} ${{ matrix.outputs }}
 
       - name: Archive compiled library
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
-          name: library-${{ matrix.name }}
+          name: library
           path: ${{ matrix.name }}.zip
 
-      # - name: Test Library (MacOS)
-      #   if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
-      #   run: |
-      #     python3 -m venv .venv
-      #     . .venv/bin/activate
-      #     python -m pip install -r test/requirements.txt
-      #     cd pymodule
-      #     python setup.py build_ext --inplace
-      #     python -m pytest
-        
-      - name: Test Library (Others)
-        if: matrix.name != 'windows-gfortran' # && matrix.runs_on != 'macos-13' && matrix.runs_on != 'macos-15'
+      - name: Prepare Test Environment
+        if: matrix.name != 'windows-gfortran' && matrix.name != 'windows-f2c'
         run: |
-          python3 -m venv .venv
-          . .venv/bin/activate
-          unset CC CXX || true
-          python -m pip install -U pip setuptools wheel
-          python -m pip install -r test/requirements.txt
+          pip3 install -r test/requirements.txt
           cd pymodule
-          python setup.py build_ext --inplace
-          cd ..
-          python -m pytest
+          python3 setup.py build_ext --inplace
 
-      # - name: Test Library
-      #   if: matrix.name != 'windows-gfortran'
-      #   run: python3 -m pytest
+      - name: Test Library
+        if: matrix.name != 'windows-gfortran' && matrix.name != 'windows-f2c'
+        run: python3 -m pytest
 
       - name: Upload Debug Spectrum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
           name: debug_radiative_transfer_${{matrix.name}}.npz
           path: ./debug_radiative_transfer.npz
 
-      # - name: Upload Release Asset
-      #   if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
-      #   id: upload-release-asset
-      #   uses: actions/upload-release-asset@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ needs.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-      #     asset_path: ./${{ matrix.name }}.zip
-      #     asset_name: ${{ matrix.name }}.zip
-      #     asset_content_type: application/zip
-
-  upload_release_asset:
-    runs-on: ubuntu-latest
-    needs: [build, manylinux-build, create_release]
-    if: ${{ needs.create_release.result == 'success' && needs.build.result == 'success' && needs['manylinux-build'].result == 'success' }}
-    permissions:
-      contents: write
-    # strategy:
-    #   matrix:
-    #     name: [linux-x64, macos-arm64]   # 与 build 的矩阵一致
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: "*"             # 把本次运行里所有 artifact 都拉下来
-          path: dist               # 统一放到 dist/
-          merge-multiple: true     # 多个 artifact 合并到一个目录
-
-      - name: List files to be uploaded
-        run: ls -al dist
-
-      - name: Upload all .zip to the release
-        uses: softprops/action-gh-release@v2
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ needs.create_release_job.outputs.tag }}   # 与上面创建的 tag 保持一致
-          draft: false
-          prerelease: true
-          files: dist/*.zip
+          upload_url: ${{ needs.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./${{ matrix.name }}.zip
+          asset_name: ${{ matrix.name }}.zip
+          asset_content_type: application/zip
