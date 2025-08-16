@@ -74,7 +74,7 @@ jobs:
           run: |
             set -eux
             yum install -y zip python3-pip python3-devel
-            git clone https://github.com/MingjieJian/SMElib .
+            # git clone https://github.com/MingjieJian/SMElib .
             
             # Replace Makefile (optinal)
             if [ "${{ matrix.makefile }}" != "Makefile.am" ]; then
