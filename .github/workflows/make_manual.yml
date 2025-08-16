@@ -375,7 +375,7 @@ jobs:
   upload_release_asset:
     runs-on: ubuntu-latest
     needs: [build, manylinux-build, create_release]
-    if: ${{needs.create_release.result == 'success'}} && ${{needs.build.result == 'success'}} && ${{needs.manylinux-build.result == 'success'}}   # 只有上游成功才上传
+    if: ${{ needs.create_release.result == 'success' && needs.build.result == 'success' && needs['manylinux-build'].result == 'success' }}
     permissions:
       contents: write
     # strategy:
@@ -385,7 +385,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: "*.zip"             # 把本次运行里所有 artifact 都拉下来
+          pattern: "*"             # 把本次运行里所有 artifact 都拉下来
           path: dist               # 统一放到 dist/
           merge-multiple: true     # 多个 artifact 合并到一个目录
 
