@@ -123,7 +123,7 @@ jobs:
             config_flags: --build=x86_64-pc-linux-gnu --host=x86_64-w64-mingw32
             outputs: bin share
             makefile: Makefile.am
-          - name: macos-intel-gfortran
+          - name: macos-x86_64-gfortran
             runs_on: macos-13
             arch: x86_64
             packages: automake libtool gcc
@@ -389,7 +389,9 @@ jobs:
           merge-multiple: true     # 多个 artifact 合并到一个目录
 
       - name: List files to be uploaded
-        run: ls -al dist
+        run: |
+          mv dist/manylinux2014_x86_64-gfortran.zip dist/manylinux2014-x86_64-gfortran.zip 
+          ls -al dist
 
       - name: Upload all .zip to the release
         uses: softprops/action-gh-release@v2
