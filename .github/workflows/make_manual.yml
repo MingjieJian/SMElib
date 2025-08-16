@@ -394,7 +394,7 @@ jobs:
         run: ls -al dist
 
       - name: Upload all .zip to the release
-        uses: softprops/action-gh-release@v2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
