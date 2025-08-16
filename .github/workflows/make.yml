@@ -213,12 +213,15 @@ jobs:
           set -eux
           cd lib
 
+          otool -L libsme.dylib
+
           # 拷贝 gfortran/quadmath/gcc_s/stdc++ 动态库
           copy_one() {
             local name="$1"
             local p="$($FC -print-file-name=$name || true)"
             [ -f "$p" ] && cp -v "$p" . || true
           }
+          copy_one libgfortran.5.dylib
           copy_one libgfortran.dylib
           copy_one libquadmath.dylib
           copy_one libgcc_s.1.1.dylib
@@ -229,6 +232,7 @@ jobs:
 
           # 用 @rpath/@loader_path 修正 install_name，避免硬编码到 Homebrew 路径
           fix_id() { [ -f "$1" ] && install_name_tool -id "@rpath/$1" "$1" || true ; }
+          fix_id libgfortran.5.dylib
           fix_id libgfortran.dylib
           fix_id libquadmath.dylib
           fix_id libgcc_s.1.1.dylib
