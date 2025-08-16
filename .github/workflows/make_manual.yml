@@ -93,7 +93,8 @@ jobs:
             ls -l lib
             zip -r "${{ matrix.container }}-${{ matrix.name }}.zip" lib share
             
-            # Install Requirements
+      - name: Pytest
+        run: |
             pip3 install -r test/requirements.txt
             cd pymodule
             python3 setup.py build_ext --inplace
