@@ -27,6 +27,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       tag: ${{ steps.tag_release.outputs.new_tag }}
     steps:
+      - uses: actions/checkout@v4
       - name: GitHub Tag
         id: tag_release
         # You may pin to the exact commit or the version.
