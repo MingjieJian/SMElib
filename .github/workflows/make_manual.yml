@@ -400,11 +400,10 @@ jobs:
         run: ls -al dist
 
       - name: Upload all .zip to the release
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./dist/${{ matrix.name }}.zip
-          asset_name: ${{ matrix.name }}.zip
-          asset_content_type: application/zip
+          tag_name: ${{ needs.create_release.outputs.tag }}   # 上游job暴露的tag
+          prerelease: true
+          files: dist/*.zip
