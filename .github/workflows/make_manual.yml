@@ -66,25 +66,11 @@ jobs:
     steps:
       - run: yum install -y zip python3-pip python3-devel
       - run: git clone https://github.com/MingjieJian/SMElib .
-      - name: Install F2C & Compile libf2c.a
-        if: matrix.compiler == 'f2c'
-        run: |
-          yum install -y f2c wget
-          cd libf2c
-          wget https://www.netlib.org/f2c/libf2c.zip
-          unzip libf2c.zip -d f2c
-          cd f2c
-          cp ../makefile.u Makefile
-          make
-          cp libf2c.a /usr/local/lib/
-          cd ../..
+
       - name: Replace Makefile
         if: matrix.makefile != 'Makefile.am'
         run: rm Makefile.am && mv ${{ matrix.makefile }} Makefile.am
-      - name: Run F2C
-        if: matrix.compiler == 'f2c'
-        run: f2c -w -a -C++ -Nn1604 -Nq1200 -dsrc/eos/ src/eos/*.f & f2c -w -a -C++ -dsrc/sme/ src/sme/*.f
-  
+       
       - run: ./bootstrap && ./configure --prefix=$PWD
       - run: make install
 
@@ -332,15 +318,15 @@ jobs:
           cd ..
           python -m pytest
 
-      # - name: Test Library
-      #   if: matrix.name != 'windows-gfortran'
-      #   run: python3 -m pytest
+      - name: Test Library
+        if: matrix.name != 'windows-gfortran'
+        run: python3 -m pytest
 
-      - name: Upload Debug Spectrum
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug_radiative_transfer_${{matrix.name}}.npz
-          path: ./debug_radiative_transfer.npz
+      # - name: Upload Debug Spectrum
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: debug_radiative_transfer_${{matrix.name}}.npz
+      #     path: ./debug_radiative_transfer.npz
 
       - name: Upload Release Asset
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
