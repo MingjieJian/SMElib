@@ -375,7 +375,7 @@ jobs:
   upload_release_asset:
     runs-on: ubuntu-latest
     needs: [build, manylinux-build, create_release]
-    if: ${{ needs.create_release_job.result == 'success' }}   # 只有上游成功才上传
+    if: ${{needs.create_release.result == 'success'}} && ${{needs.build.result == 'success'}} && ${{needs.manylinux-build.result == 'success'}}   # 只有上游成功才上传
     permissions:
       contents: write
     # strategy:
