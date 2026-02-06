@@ -2,6 +2,10 @@
 # SMElib
 Spectroscopy Made Easy Source Library
 
+Note: Versions older than v6.0.7 have less accurate H line wings due to earlier handling of H2-, CH-, C2-, CN-, OH-, SiH-, and HS- in `eos.f`. 
+
+If you installed SMElib before v6.0.7 (2025-07-23), please update to the latest version.
+
 This is just the C and Fortran part of SME. The complete package is available at [download](https://github.com/AWehrhahn/SME). The classic IDL version of SME is available for [download](http://www.stsci.edu/~valenti/sme.html).
 
 Spectroscopy Made Easy (SME) is a software tool that fits an observed
