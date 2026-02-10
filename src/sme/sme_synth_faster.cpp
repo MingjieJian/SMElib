@@ -181,6 +181,13 @@ short flagMODEL, flagWLRANGE, flagABUND, flagLINELIST,
 
 short debug_print;
 
+/* Precomputed line information control */
+int lineinfo_mode=0; /* 0=internal, 1=use if valid, 2=strict trust */
+int precomputed_nlines=0;
+short has_precomputed_ranges=0, has_precomputed_strongmask=0, has_precomputed_depth=0;
+double *pre_range_s=NULL, *pre_range_e=NULL, *pre_depth=NULL;
+unsigned char *pre_strong=NULL;
+
 /* Timing variables */
 time_t t_op=0, t_rt=0, t_tot=0;
 
@@ -211,6 +218,18 @@ time_t t_op=0, t_rt=0, t_tot=0;
 #define CALLOC(ptr, varlen, vartype) ptr=(vartype*)calloc(varlen, sizeof(vartype))
 
 #define FREE(ptr) if(ptr!=NULL) {free((char *)ptr); ptr=NULL;}
+
+static void FreePrecomputedLineInfo(void)
+{
+  FREE(pre_range_s);
+  FREE(pre_range_e);
+  FREE(pre_strong);
+  FREE(pre_depth);
+  has_precomputed_ranges=0;
+  has_precomputed_strongmask=0;
+  has_precomputed_depth=0;
+  precomputed_nlines=0;
+}
 
 /* Modules */
 
@@ -429,6 +448,95 @@ extern "C" char const * SME_DLL ClearH2broad(int n, void *arg[])    /* Clear fla
   return &OK_response;
 }
 
+extern "C" char const * SME_DLL SetLineInfoMode(int n, void *arg[])
+{
+  int mode;
+  if(n<1)
+  {
+    strncpy(result, "SetLineInfoMode: Not enough arguments", 511);
+    return result;
+  }
+  mode=*(int *)arg[0];
+  if(mode<0 || mode>2)
+  {
+    strncpy(result, "SetLineInfoMode: mode must be 0, 1, or 2", 511);
+    return result;
+  }
+  lineinfo_mode=mode;
+  return &OK_response;
+}
+
+extern "C" char const * SME_DLL InputLinePrecomputedInfo(int n, void *arg[])
+{
+  int nlines;
+  double *range_s, *range_e, *depth_in=NULL;
+  unsigned char *strong_in;
+
+  if(n<4)
+  {
+    strncpy(result, "InputLinePrecomputedInfo: Requires nlines, range_s, range_e, strong_mask", 511);
+    return result;
+  }
+
+  nlines=*(int *)arg[0];
+  if(nlines<0)
+  {
+    strncpy(result, "InputLinePrecomputedInfo: nlines must be >= 0", 511);
+    return result;
+  }
+
+  range_s=(double *)arg[1];
+  range_e=(double *)arg[2];
+  strong_in=(unsigned char *)arg[3];
+  if(range_s==NULL || range_e==NULL || strong_in==NULL)
+  {
+    strncpy(result, "InputLinePrecomputedInfo: range_s/range_e/strong_mask cannot be NULL", 511);
+    return result;
+  }
+  if(n>4) depth_in=(double *)arg[4];
+
+  FreePrecomputedLineInfo();
+  if(nlines==0)
+  {
+    has_precomputed_ranges=1;
+    has_precomputed_strongmask=1;
+    has_precomputed_depth=(depth_in!=NULL)?1:0;
+    precomputed_nlines=0;
+    return &OK_response;
+  }
+
+  CALLOC(pre_range_s, nlines, double);
+  CALLOC(pre_range_e, nlines, double);
+  CALLOC(pre_strong, nlines, unsigned char);
+  if(pre_range_s==NULL || pre_range_e==NULL || pre_strong==NULL)
+  {
+    FreePrecomputedLineInfo();
+    strncpy(result, "InputLinePrecomputedInfo: Not enough memory", 511);
+    return result;
+  }
+  memcpy(pre_range_s, range_s, nlines*sizeof(double));
+  memcpy(pre_range_e, range_e, nlines*sizeof(double));
+  memcpy(pre_strong, strong_in, nlines*sizeof(unsigned char));
+
+  if(depth_in!=NULL)
+  {
+    CALLOC(pre_depth, nlines, double);
+    if(pre_depth==NULL)
+    {
+      FreePrecomputedLineInfo();
+      strncpy(result, "InputLinePrecomputedInfo: Not enough memory", 511);
+      return result;
+    }
+    memcpy(pre_depth, depth_in, nlines*sizeof(double));
+    has_precomputed_depth=1;
+  }
+
+  has_precomputed_ranges=1;
+  has_precomputed_strongmask=1;
+  precomputed_nlines=nlines;
+  return &OK_response;
+}
+
 extern "C" char const * SME_DLL InputLineList(int n, void *arg[]) /* Read in line list */
 {
   short l;
@@ -449,6 +557,7 @@ extern "C" char const * SME_DLL InputLineList(int n, void *arg[]) /* Read in lin
    GAMVW  - VAN DER WAALS DUMPING (C6);
 */
   if(n<2) {strncpy(result, "Not enough arguments", 511); return result;}
+  FreePrecomputedLineInfo();
   if(flagLINELIST)
   {
     if(spname !=NULL)    FREE(spname);
@@ -713,6 +822,7 @@ extern "C" char const * SME_DLL UpdateLineList(int n, void *arg[]) /* Change lin
     strncpy(result, "Line list was not set. Cannot update.", 511);
     return result;
   }
+  FreePrecomputedLineInfo();
   NUPDTE=*(short *)arg[0];
   if(NUPDTE<1) return &OK_response;
 
@@ -5450,6 +5560,7 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
          source_cont[MOSIZE];
   short NMU, iret, keep_lineop, long_continuum;
   int line;
+  int use_precomputed_lineinfo=0;
 
 //  struct rusage r_usage;
 //  time_t t1;
@@ -5546,6 +5657,61 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
 
   if(!keep_lineop)
   {
+    int lineinfo_valid=1;
+
+    if(lineinfo_mode!=0)
+    {
+      if(!has_precomputed_ranges || !has_precomputed_strongmask)
+      {
+        lineinfo_valid=0;
+        if(lineinfo_mode==2)
+        {
+          strncpy(result, "Transf: precomputed line info missing (range/mask)", 511);
+          return result;
+        }
+        fprintf(stderr, "SMElib warning: precomputed line info missing, fallback to internal lineinfo.\n");
+      }
+      else if(precomputed_nlines!=NLINES)
+      {
+        lineinfo_valid=0;
+        if(lineinfo_mode==2)
+        {
+          snprintf(result, 511, "Transf: precomputed nlines (%d) != NLINES (%d)", precomputed_nlines, NLINES);
+          return result;
+        }
+        fprintf(stderr, "SMElib warning: precomputed nlines mismatch, fallback to internal lineinfo.\n");
+      }
+      else
+      {
+        for(line=0;line<NLINES;line++)
+        {
+          if(!isfinite(pre_range_s[line]) || !isfinite(pre_range_e[line]))
+          {
+            lineinfo_valid=0;
+            if(lineinfo_mode==2)
+            {
+              snprintf(result, 511, "Transf: precomputed line range is NaN/Inf at index %d", line);
+              return result;
+            }
+            fprintf(stderr, "SMElib warning: precomputed line range NaN/Inf at index %d, fallback to internal lineinfo.\n", line);
+            break;
+          }
+          if(pre_range_s[line]>pre_range_e[line])
+          {
+            lineinfo_valid=0;
+            if(lineinfo_mode==2)
+            {
+              snprintf(result, 511, "Transf: precomputed range_s > range_e at index %d", line);
+              return result;
+            }
+            fprintf(stderr, "SMElib warning: precomputed range_s > range_e at index %d, fallback to internal lineinfo.\n", line);
+            break;
+          }
+        }
+      }
+      if(lineinfo_valid) use_precomputed_lineinfo=1;
+    }
+
 /* Allocate temporary arrays */
 
 //    YABUND=(double *)calloc(NLINES, sizeof(double));
@@ -5571,7 +5737,13 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     for(line=0;line<NLINES;line++)
     {
       LINEOPAC(line);
-      if(NWL==0)
+      if(use_precomputed_lineinfo)
+      {
+        MARK[line]=pre_strong[line]?0:2;
+        Wlim_left [line]=pre_range_s[line];
+        Wlim_right[line]=pre_range_e[line];
+      }
+      else if(NWL==0)
       {
         MARK[line]=(ALMAX[line]<EPS1)?2:-1;
         Wlim_left [line]=max(WLCENT[line]-1000., 0.); /* Initialize line contribution limits */
@@ -5586,22 +5758,25 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
     FREE(YABUND);
 
 // Line contribution limits
-    for(line=0;line<NLINES;line++) // Check the line contribution at various detunings
+    if(!use_precomputed_lineinfo)
     {
-      delta_lambda=0.2;
-      WW=WLCENT[line];
-      if(MARK[line]==-1)
+      for(line=0;line<NLINES;line++) // Check the line contribution at various detunings
       {
-        MARK[line]=0;
-        do
+        delta_lambda=0.2;
+        WW=WLCENT[line];
+        if(MARK[line]==-1)
         {
-          delta_lambda=delta_lambda*1.5;
-          OPMTRX(WW+delta_lambda, opacity_tot, opacity_cont,
-                 source, source_cont, line, line); // Assess line contribution at a given offset
+          MARK[line]=0;
+          do
+          {
+            delta_lambda=delta_lambda*1.5;
+            OPMTRX(WW+delta_lambda, opacity_tot, opacity_cont,
+                   source, source_cont, line, line); // Assess line contribution at a given offset
+          }
+          while(ALMAX[line]>EPS1);
+          Wlim_left [line]=max(WW-delta_lambda,0.);
+          Wlim_right[line]=min(WW+delta_lambda,2000000.);
         }
-        while(ALMAX[line]>EPS1);
-        Wlim_left [line]=max(WW-delta_lambda,0.);
-        Wlim_right[line]=min(WW+delta_lambda,2000000.);
       }
     }
 //    for(line=0; line<NLINES; line++)
