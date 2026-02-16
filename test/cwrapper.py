@@ -224,8 +224,8 @@ def get_typenames(arg):
     floating points -> "double"
     integers -> "int"
     """
-    if isinstance(arg, (str, np.str)) or (
-        isinstance(arg, np.ndarray) and np.issubdtype(arg.dtype, np.str)
+    if isinstance(arg, (str, np.character)) or (
+        isinstance(arg, np.ndarray) and np.issubdtype(arg.dtype, np.character)
     ):
         return "unicode"
     if isinstance(arg, (float, np.floating)) or (
@@ -380,7 +380,7 @@ def idl_call_external(funcname, *args, restype="str", type=None, lib=None, state
                 )
                 staying_alive[i] = args[i].ctypes
                 args[i] = staying_alive[i].data
-            elif np.issubdtype(args[i].dtype, np.str_) or np.issubdtype(
+            elif np.issubdtype(args[i].dtype, np.character) or np.issubdtype(
                 args[i].dtype, np.bytes_
             ):
                 args[i] = args[i].astype("S")
@@ -437,7 +437,7 @@ def idl_call_external(funcname, *args, restype="str", type=None, lib=None, state
                 if original[i] is staying_alive[i]._arr:
                     continue
                 arr = staying_alive[i]._arr
-            elif np.issubdtype(original[i].dtype, np.str_):
+            elif np.issubdtype(original[i].dtype, np.character):
                 # For string arrays recover the strings from the IDL_String structure
                 arr = [s.s.decode() for s in staying_alive[i]]
             else:

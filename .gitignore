@@ -92,3 +92,6 @@ origin/
 cython/smelib.egg-info/
 cython/smelib.cpp
 .version
+
+# VS Code
+.vscode/

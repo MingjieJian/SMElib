@@ -1,17 +1,24 @@
-![CMake](https://github.com/AWehrhahn/SMElib/workflows/CMake/badge.svg)
+[![make](https://github.com/MingjieJian/SMElib/actions/workflows/make.yml/badge.svg?branch=master)](https://github.com/MingjieJian/SMElib/actions/workflows/make.yml)
 # SMElib
+
 Spectroscopy Made Easy Source Library
 
-This is just the C and Fortran part of SME. The complete package is available at [download](https://github.com/AWehrhahn/SME). The classic IDL version of SME is available for [download](http://www.stsci.edu/~valenti/sme.html).
+Note: 
+- Versions older than v6.0.7 have less accurate H line wings due to earlier handling of EOS. 
+- Starting from v6.13.13, the suppoort for x86/Intel platform macOS is dropped.
+
+If you installed SMElib before v6.0.7 (2025-07-23), please update to the latest version.
+
+This is the C and Fortran part of SME. The complete package is available at [download](https://github.com/MingjieJian/SME). The classic IDL version of SME is available for [download](http://www.stsci.edu/~valenti/sme.html).
 
 Spectroscopy Made Easy (SME) is a software tool that fits an observed
 spectrum of a star with a model spectrum. Since its initial release in
 [1996](http://adsabs.harvard.edu/abs/1996A%26AS..118..595V).
 
 ## Download
-You can find compiled versions of the library for Unix, Mac OS, and Windows under [Releases](https://github.com/AWehrhahn/SMElib/releases).
+You can find compiled versions of the library for Linux and Mac OS under [Releases](https://github.com/MingjieJian/SMElib/releases).
 
-There are two versions for each OS. The gfortran version uses gfortran to compile the Fortran code, while the [F2C](https://www.netlib.org/f2c/) version first converts the Fortran code to C++ code. The difference between these two are that f2c does not require libgfortran, but gives slightly numerical differences. It also appears to run faster in preliminary tests.
+<!-- There are two versions for each OS. The gfortran version uses gfortran to compile the Fortran code, while the [F2C](https://www.netlib.org/f2c/) version first converts the Fortran code to C++ code. The difference between these two are that f2c does not require libgfortran, but gives slightly numerical differences. It also appears to run faster in preliminary tests. -->
 Note that depending on your system you might have to install libgfortran as well.
 
 ## Notes

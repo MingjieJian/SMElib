@@ -791,8 +791,11 @@ static PyObject *smelib_GetOpacity(PyObject *self, PyObject *args, PyObject *kwd
     PyArrayObject *arr;
 
     static const char *keywords[] = {"flag", "species", "key", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|ss", const_cast<char **>(keywords), &choice))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|ss", const_cast<char **>(keywords),
+                                     &choice, &species, &key))
+    {
         return NULL;
+    }
 
     if (strcmp(choice, "COPSTD") == 0)
         number = -3;
