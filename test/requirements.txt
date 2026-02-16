@@ -1,2 +1,2 @@
-numpy==1.26.4
-pytest==7.2.0
+numpy
+pytest>=8.4.2,<10

@@ -1,10 +1,11 @@
 [![make](https://github.com/MingjieJian/SMElib/actions/workflows/make.yml/badge.svg?branch=master)](https://github.com/MingjieJian/SMElib/actions/workflows/make.yml)
-
-
 # SMElib
+
 Spectroscopy Made Easy Source Library
 
-Note: Versions older than v6.0.7 have less accurate H line wings due to earlier handling of EOS. 
+Note: 
+- Versions older than v6.0.7 have less accurate H line wings due to earlier handling of EOS. 
+- Starting from v6.13.13, the suppoort for x86/Intel platform macOS is dropped.
 
 If you installed SMElib before v6.0.7 (2025-07-23), please update to the latest version.
 
