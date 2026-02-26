@@ -187,6 +187,7 @@ int precomputed_nlines=0;
 short has_precomputed_ranges=0, has_precomputed_strongmask=0, has_precomputed_depth=0;
 double *pre_range_s=NULL, *pre_range_e=NULL, *pre_depth=NULL;
 unsigned char *pre_strong=NULL;
+int *active_idx=NULL, n_active_idx=0, active_idx_valid=0;
 
 /* Timing variables */
 time_t t_op=0, t_rt=0, t_tot=0;
@@ -219,6 +220,246 @@ time_t t_op=0, t_rt=0, t_tot=0;
 
 #define FREE(ptr) if(ptr!=NULL) {free((char *)ptr); ptr=NULL;}
 
+typedef struct
+{
+  double setup_sec;
+  double lineopac_sec;
+  long long lineopac_calls;
+  double range_scan_sec;
+  long long range_scan_calls;
+  long long range_scan_lines;
+  double rkints_sec;
+  long long rkints_calls;
+  double rkints_sph_sec;
+  long long rkints_sph_calls;
+  double opmtrx_sec;
+  long long opmtrx_calls;
+  double tbintg_sec;
+  long long tbintg_calls;
+  double tbintg_sph_sec;
+  long long tbintg_sph_calls;
+  double transf_total_sec;
+  long long lines_active_mark0;
+  long long lines_inactive_mark_non0;
+  long long lines_overlap_window_all;
+  long long lines_overlap_window_active;
+  double lines_window_lo;
+  double lines_window_hi;
+  int lines_count_valid;
+} SME_TIMING_STATS;
+
+static SME_TIMING_STATS timing_stats;
+static int timing_env_checked=0;
+static int timing_enabled=0;
+static int timing_in_transf=0;
+static long long timing_transf_seq=0;
+static int active_idx_env_checked=0;
+static int active_idx_enabled=1;
+
+static double TimingNowSec(void)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (double)ts.tv_sec + 1e-9*(double)ts.tv_nsec;
+}
+
+static int TimingIsEnabled(void)
+{
+  const char *e;
+  if(timing_env_checked) return timing_enabled;
+  timing_env_checked=1;
+  e=getenv("SME_TIMING");
+  if(e==NULL || e[0]=='\0' ||
+     !strcmp(e,"0") || !strcmp(e,"false") || !strcmp(e,"FALSE") ||
+     !strcmp(e,"off") || !strcmp(e,"OFF") || !strcmp(e,"no") || !strcmp(e,"NO"))
+  {
+    timing_enabled=0;
+  }
+  else
+  {
+    timing_enabled=1;
+  }
+  return timing_enabled;
+}
+
+static int TimingIsActive(void)
+{
+  return TimingIsEnabled() && timing_in_transf;
+}
+
+static int ActiveIdxIsEnabled(void)
+{
+  const char *e;
+  if(active_idx_env_checked) return active_idx_enabled;
+  active_idx_env_checked=1;
+  e=getenv("SME_ACTIVE_IDX");
+  if(e==NULL || e[0]=='\0')
+  {
+    active_idx_enabled=1;
+  }
+  else if(!strcmp(e,"0") || !strcmp(e,"false") || !strcmp(e,"FALSE") ||
+          !strcmp(e,"off") || !strcmp(e,"OFF") || !strcmp(e,"no") || !strcmp(e,"NO"))
+  {
+    active_idx_enabled=0;
+  }
+  else
+  {
+    active_idx_enabled=1;
+  }
+  return active_idx_enabled;
+}
+
+static void TimingResetStats(void)
+{
+  memset(&timing_stats, 0, sizeof(timing_stats));
+}
+
+static void TimingPrintTransfSummary(long long seq, short keep_lineop, int nwl,
+                                     int use_precomputed_lineinfo, short long_continuum)
+{
+  double total=timing_stats.transf_total_sec;
+  if(!TimingIsEnabled()) return;
+  fprintf(stderr,
+          "SMElib timing [Transf#%lld keep_lineop=%d nlines=%d nwl=%d precomputed=%d long_cont=%d]\n",
+          seq, (int)keep_lineop, NLINES, nwl, use_precomputed_lineinfo, (int)long_continuum);
+  fprintf(stderr, "  total      : %10.6f s\n", total);
+  fprintf(stderr, "  setup      : %10.6f s\n", timing_stats.setup_sec);
+  fprintf(stderr, "  LINEOPAC   : %10.6f s, calls=%lld\n",
+          timing_stats.lineopac_sec, timing_stats.lineopac_calls);
+  fprintf(stderr, "  range_scan : %10.6f s, scans=%lld, lines=%lld\n",
+          timing_stats.range_scan_sec, timing_stats.range_scan_calls, timing_stats.range_scan_lines);
+  fprintf(stderr, "  RKINTS     : %10.6f s, calls=%lld\n",
+          timing_stats.rkints_sec, timing_stats.rkints_calls);
+  fprintf(stderr, "  RKINTS_sph : %10.6f s, calls=%lld\n",
+          timing_stats.rkints_sph_sec, timing_stats.rkints_sph_calls);
+  fprintf(stderr, "  OPMTRX     : %10.6f s, calls=%lld\n",
+          timing_stats.opmtrx_sec, timing_stats.opmtrx_calls);
+  fprintf(stderr, "  TBINTG     : %10.6f s, calls=%lld\n",
+          timing_stats.tbintg_sec, timing_stats.tbintg_calls);
+  fprintf(stderr, "  TBINTG_sph : %10.6f s, calls=%lld\n",
+          timing_stats.tbintg_sph_sec, timing_stats.tbintg_sph_calls);
+  if(timing_stats.lines_count_valid)
+  {
+    fprintf(stderr, "  lines      : active(mark=0)=%lld, inactive(mark!=0)=%lld\n",
+            timing_stats.lines_active_mark0, timing_stats.lines_inactive_mark_non0);
+    fprintf(stderr, "  lines_win  : [%.3f, %.3f] all=%lld, active=%lld\n",
+            timing_stats.lines_window_lo, timing_stats.lines_window_hi,
+            timing_stats.lines_overlap_window_all, timing_stats.lines_overlap_window_active);
+  }
+  fflush(stderr);
+}
+
+static void TimingUpdateLineSelectionStats(int nwl, double *wl)
+{
+  int line;
+  double wlo, whi;
+  long long active=0, inactive=0, overlap_all=0, overlap_active=0;
+  if(!TimingIsActive()) return;
+  if(NLINES<=0 || MARK==NULL || Wlim_left==NULL || Wlim_right==NULL)
+  {
+    timing_stats.lines_count_valid=0;
+    return;
+  }
+  if(nwl>0 && wl!=NULL)
+  {
+    wlo=wl[0];
+    whi=wl[nwl-1];
+  }
+  else
+  {
+    wlo=WFIRST;
+    whi=WLAST;
+  }
+  if(wlo>whi)
+  {
+    double tmp=wlo;
+    wlo=whi;
+    whi=tmp;
+  }
+  for(line=0; line<NLINES; line++)
+  {
+    int is_active=(MARK[line]==0);
+    int overlaps=(Wlim_right[line]>wlo && Wlim_left[line]<whi);
+    if(is_active) active++;
+    else inactive++;
+    if(overlaps)
+    {
+      overlap_all++;
+      if(is_active) overlap_active++;
+    }
+  }
+  timing_stats.lines_active_mark0=active;
+  timing_stats.lines_inactive_mark_non0=inactive;
+  timing_stats.lines_overlap_window_all=overlap_all;
+  timing_stats.lines_overlap_window_active=overlap_active;
+  timing_stats.lines_window_lo=wlo;
+  timing_stats.lines_window_hi=whi;
+  timing_stats.lines_count_valid=1;
+}
+
+class ScopedTimingCounter
+{
+  double *acc_sec;
+  long long *acc_calls;
+  double t0;
+  int active;
+public:
+  ScopedTimingCounter(double *sec_ptr, long long *calls_ptr)
+      : acc_sec(sec_ptr), acc_calls(calls_ptr), t0(0.), active(0)
+  {
+    if(TimingIsActive())
+    {
+      t0=TimingNowSec();
+      active=1;
+    }
+  }
+  ~ScopedTimingCounter()
+  {
+    if(active)
+    {
+      *acc_sec+=TimingNowSec()-t0;
+      if(acc_calls!=NULL) (*acc_calls)++;
+    }
+  }
+};
+
+class ScopedTransfTiming
+{
+  short *keep_lineop;
+  int *nwl;
+  int *use_precomputed_lineinfo;
+  short *long_continuum;
+  long long seq;
+  double t0;
+  int active;
+public:
+  ScopedTransfTiming(short *keep_lineop_ptr, int *nwl_ptr,
+                     int *use_precomputed_ptr, short *long_continuum_ptr)
+      : keep_lineop(keep_lineop_ptr), nwl(nwl_ptr),
+        use_precomputed_lineinfo(use_precomputed_ptr),
+        long_continuum(long_continuum_ptr),
+        seq(0), t0(0.), active(0)
+  {
+    if(TimingIsEnabled())
+    {
+      TimingResetStats();
+      timing_in_transf=1;
+      seq=++timing_transf_seq;
+      t0=TimingNowSec();
+      active=1;
+    }
+  }
+  ~ScopedTransfTiming()
+  {
+    if(active)
+    {
+      timing_stats.transf_total_sec=TimingNowSec()-t0;
+      TimingPrintTransfSummary(seq, *keep_lineop, *nwl, *use_precomputed_lineinfo, *long_continuum);
+      timing_in_transf=0;
+    }
+  }
+};
+
 static void FreePrecomputedLineInfo(void)
 {
   FREE(pre_range_s);
@@ -229,6 +470,56 @@ static void FreePrecomputedLineInfo(void)
   has_precomputed_strongmask=0;
   has_precomputed_depth=0;
   precomputed_nlines=0;
+}
+
+static void FreeActiveLineIndex(void)
+{
+  FREE(active_idx);
+  n_active_idx=0;
+  active_idx_valid=0;
+}
+
+static void BuildActiveLineIndex(void)
+{
+  int line, k=0;
+  if(!ActiveIdxIsEnabled())
+  {
+    FreeActiveLineIndex();
+    return;
+  }
+  if(NLINES<=0 || MARK==NULL)
+  {
+    FreeActiveLineIndex();
+    return;
+  }
+  if(active_idx==NULL)
+  {
+    CALLOC(active_idx, NLINES, int);
+    if(active_idx==NULL)
+    {
+      n_active_idx=0;
+      active_idx_valid=0;
+      return;
+    }
+  }
+  for(line=0; line<NLINES; line++)
+  {
+    if(MARK[line]==0) active_idx[k++]=line;
+  }
+  n_active_idx=k;
+  active_idx_valid=1;
+}
+
+static int ActiveIdxLowerBound(int value)
+{
+  int lo=0, hi=n_active_idx;
+  while(lo<hi)
+  {
+    int mid=lo+(hi-lo)/2;
+    if(active_idx[mid]<value) lo=mid+1;
+    else hi=mid;
+  }
+  return lo;
 }
 
 /* Modules */
@@ -560,6 +851,7 @@ extern "C" char const * SME_DLL InputLineList(int n, void *arg[]) /* Read in lin
   FreePrecomputedLineInfo();
   if(flagLINELIST)
   {
+    FreeActiveLineIndex();
     if(spname !=NULL)    FREE(spname);
     if(SPINDEX!=NULL)    FREE(SPINDEX);
     if(ION    !=NULL)    FREE(ION);
@@ -593,6 +885,7 @@ extern "C" char const * SME_DLL InputLineList(int n, void *arg[]) /* Read in lin
   NLINES=*(int *)arg[0];
   if(NLINES<1)
   {
+    FreeActiveLineIndex();
     flagLINELIST=0;
     strncpy(result, "No line list", 511);
     return result;
@@ -646,6 +939,7 @@ extern "C" char const * SME_DLL InputLineList(int n, void *arg[]) /* Read in lin
 
   if(Wlim_right==NULL)
   {
+    FreeActiveLineIndex();
     if(spname !=NULL)
     {
       FREE(spname);
@@ -5036,7 +5330,7 @@ extern "C" char const * SME_DLL Ionization(int n, void *arg[])
    SPINDEX[NLINES]
 */
 
-  int LINE;
+  int LINE, line_iter, use_active_span=0, active_lo=0, active_hi=0;
   char *species_list;
   int i, NITER, nelem, eos_mode, pf_mode, j;
   int use_electron_density_from_EOS, use_particle_density_from_EOS,
@@ -5558,7 +5852,7 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
          P_impact, WW, delta_lambda;
   double opacity_tot[MOSIZE], opacity_cont[MOSIZE], source[MOSIZE],
          source_cont[MOSIZE];
-  short NMU, iret, keep_lineop, long_continuum;
+  short NMU, iret, keep_lineop=0, long_continuum;
   int line;
   int use_precomputed_lineinfo=0;
 
@@ -5655,9 +5949,13 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
   }
   else long_continuum=0;
 
+  ScopedTransfTiming scoped_transf_timing(&keep_lineop, &NWL, &use_precomputed_lineinfo, &long_continuum);
+
   if(!keep_lineop)
   {
     int lineinfo_valid=1;
+    double t_setup0=0.;
+    if(TimingIsActive()) t_setup0=TimingNowSec();
 
     if(lineinfo_mode!=0)
     {
@@ -5760,6 +6058,8 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
 // Line contribution limits
     if(!use_precomputed_lineinfo)
     {
+      double t_range0=0.;
+      if(TimingIsActive()) t_range0=TimingNowSec();
       for(line=0;line<NLINES;line++) // Check the line contribution at various detunings
       {
         delta_lambda=0.2;
@@ -5778,13 +6078,23 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
           Wlim_right[line]=min(WW+delta_lambda,2000000.);
         }
       }
+      if(TimingIsActive())
+      {
+        timing_stats.range_scan_sec+=TimingNowSec()-t_range0;
+        timing_stats.range_scan_calls++;
+        timing_stats.range_scan_lines+=NLINES;
+      }
     }
 //    for(line=0; line<NLINES; line++)
 //    {
 //      printf("Transf in: Line %d, mark=%d, Left:%10.8g, wlcent:%10.8g, Right:%10.8g, %d, %d\n",
 //              line,MARK[line],Wlim_left[line],WLCENT[line],Wlim_right[line],mark_total,NLINES);
 //    }
+    if(TimingIsActive()) timing_stats.setup_sec+=TimingNowSec()-t_setup0;
   }
+
+  BuildActiveLineIndex();
+  TimingUpdateLineSelectionStats(NWL, WL);
 
   if(MOTYPE==3) /* If things get spherical initialize a 2D array of MUs and do the RT */
   {
@@ -5944,6 +6254,145 @@ extern "C" char const * SME_DLL GetLineRange(int n, void *arg[]) /* Get importan
   return &OK_response;
 }
 
+extern "C" char const * SME_DLL ALMAXRange(int n, void *arg[]) /* Compute ALMAX and first-stage range */
+{
+  int nlines, line, ncopy;
+  double *a_almax, *a_range;
+  double EPS1, WW, delta_lambda;
+  double opacity_tot[MOSIZE], opacity_cont[MOSIZE], source[MOSIZE], source_cont[MOSIZE];
+
+  if(!flagMODEL)
+  {
+    strncpy(result, "No model atmosphere has been set", 511); return result;
+  }
+  if(!flagWLRANGE)
+  {
+    strncpy(result, "No wavelength range has been set", 511); return result;
+  }
+  if(!flagABUND)
+  {
+    strncpy(result, "No list of abundances has been set", 511); return result;
+  }
+  if(!flagLINELIST)
+  {
+    strncpy(result, "No line list has been set", 511); return result;
+  }
+  if(!flagIONIZ)
+  {
+    strncpy(result, "Molecular-ionization equilibrium was not computed", 511);
+    return result;
+  }
+  if(!flagCONTIN)
+  {
+    strncpy(result, "No arrays have been allocated for continous opacity calculations", 511);
+    return result;
+  }
+  if(!lineOPACITIES)
+  {
+    strncpy(result, "No memory has been allocated for storing line opacities", 511);
+    return result;
+  }
+
+  if(n<4)
+  {
+    strncpy(result, "ALMAXRange: Requires almax, range, nlines, and accrt", 511);
+    return result;
+  }
+
+  a_almax=(double *)arg[0];
+  a_range=(double *)arg[1];
+  nlines=*(int *)arg[2];
+  EPS1=*(double *)arg[3];
+  if(a_almax==NULL || a_range==NULL)
+  {
+    strncpy(result, "ALMAXRange: almax/range pointer cannot be NULL", 511);
+    return result;
+  }
+  if(nlines<0)
+  {
+    strncpy(result, "ALMAXRange: nlines must be >= 0", 511);
+    return result;
+  }
+
+  CALLOC(YABUND, NLINES, double);
+  CALLOC(XMASS,  NLINES, double);
+  CALLOC(EXCUP,  NLINES, double);
+  CALLOC(ENU4,   NLINES, double);
+  CALLOC(ENL4,   NLINES, double);
+  if(ENL4==NULL)
+  {
+    FREE(ENL4);
+    FREE(ENU4);
+    FREE(EXCUP);
+    FREE(XMASS);
+    FREE(YABUND);
+    strncpy(result, "Not enough memory", 511);
+    return result;
+  }
+
+  AutoIonization();
+
+  ncopy=min(nlines, NLINES);
+  for(line=0; line<NLINES; line++)
+  {
+    LINEOPAC(line);
+    if(line<ncopy) a_almax[line]=ALMAX[line];
+    MARK[line]=(ALMAX[line]<EPS1)?2:-1;
+    Wlim_left [line]=max(WLCENT[line]-1000., 0.);
+    Wlim_right[line]=min(WLCENT[line]+1000., 2000000.);
+    ALMAX[line]=0.;
+  }
+
+  for(line=0; line<NLINES; line++)
+  {
+    if(MARK[line]==-1)
+    {
+      MARK[line]=0;
+      delta_lambda=0.2;
+      WW=WLCENT[line];
+      do
+      {
+        delta_lambda=delta_lambda*1.5;
+        OPMTRX(WW+delta_lambda, opacity_tot, opacity_cont,
+               source, source_cont, line, line);
+      }
+      while(ALMAX[line]>EPS1);
+      Wlim_left [line]=max(WW-delta_lambda, 0.);
+      Wlim_right[line]=min(WW+delta_lambda, 2000000.);
+    }
+  }
+
+  for(line=0; line<ncopy; line++)
+  {
+    if(MARK[line])
+    {
+      a_range[2*line  ]=WLCENT[line];
+      a_range[2*line+1]=WLCENT[line];
+    }
+    else
+    {
+      a_range[2*line  ]=Wlim_left[line];
+      a_range[2*line+1]=Wlim_right[line];
+    }
+  }
+  for(line=ncopy; line<nlines; line++)
+  {
+    a_almax[line]=0.;
+    a_range[2*line  ]=0.;
+    a_range[2*line+1]=0.;
+  }
+
+  BuildActiveLineIndex();
+
+  FREE(ENL4);
+  FREE(ENU4);
+  FREE(EXCUP);
+  FREE(XMASS);
+  FREE(YABUND);
+
+  return &OK_response;
+}
+
 extern "C" char const * SME_DLL CentralDepth(int n, void *arg[])
 {
 /*  THIS SUBROUTINE EXPLICITLY SOLVES THE TRANSFER EQUATION
@@ -6092,6 +6541,7 @@ int RKINTS_sph(double rhox[][2*MOSIZE], int NMU, int NRHOXs[], double EPS1, doub
                double *FCBLUE, double *FCRED, double *TABLE, int NWSIZE, int &NWL,
                double *WL, short long_continuum, int grazing[])
 {
+  ScopedTimingCounter timing_counter(&timing_stats.rkints_sph_sec, &timing_stats.rkints_sph_calls);
 /*  THIS SUBROUTINE CALLS SUBROUTINE FCINTG TO INTEGRATE THE EMMERGING
     SPECIFIC INTENSITIES FOR CONTINUUM AT THE EDGES OF SPECTRAL
     INTERVAL (returned as "FC*") AND SUBROUTINE TBINTG FOR THE LINE
@@ -6392,6 +6842,7 @@ int RKINTS(double *rhox, int NMU, double EPS1, double EPS2,
            int NWSIZE, int &NWL, double *WL,
            short long_continuum)
 {
+  ScopedTimingCounter timing_counter(&timing_stats.rkints_sec, &timing_stats.rkints_calls);
 /*  THIS SUBROUTINE CALLS SUBROUTINE FCINTG TO INTEGRATE THE EMERGING
     SPECIFIC INTENSITIES FOR CONTINUUM AT THE EDGES OF SPECTRAL
     INTERVAL (returned as "FC*") AND SUBROUTINE TBINTG FOR THE LINE
@@ -6848,6 +7299,7 @@ double FCINTG(double MU, double WAVE, double *COPWL)
 void TBINTG_sph(int NRHOX, double RHOX[], double opacity[], double source[],
                 double *RESULT, int grazing)
 {
+  ScopedTimingCounter timing_counter(&timing_stats.tbintg_sph_sec, &timing_stats.tbintg_sph_calls);
 /*
   RT solver
   AUTHOR: N.Piskunov
@@ -7043,6 +7495,7 @@ void TBINTG1(double rhox[], double opacity[], double source[], double *RESULT)
 void TBINTG(int Nmu, double rhox[], double opacity[], double source[],
             double RESULT[])
 {
+  ScopedTimingCounter timing_counter(&timing_stats.tbintg_sec, &timing_stats.tbintg_calls);
 /*
   RT solver for plane parallel geometry
   AUTHOR: N.Piskunov
@@ -7734,6 +8187,7 @@ extern "C" char const * SME_DLL GetLineOpacity(int n, void *arg[]) /* Returns sp
 
 void LINEOPAC(int LINE)
 {
+  ScopedTimingCounter timing_counter(&timing_stats.lineopac_sec, &timing_stats.lineopac_calls);
 /*
    This function computes central line opacity without the
    profile and the line width. The exception is the Hydrogen
@@ -8049,6 +8503,7 @@ void LINEOPAC(int LINE)
 void OPMTRX(double WAVE, double *XK, double *XC, double *source_line, 
             double *source_cont, int LINE_START, int LINE_FINISH)
 {
+  ScopedTimingCounter timing_counter(&timing_stats.opmtrx_sec, &timing_stats.opmtrx_calls);
 /*
    THIS FUNCTION CALCULATES THE OPACITY OR OPACITY RATIO (OPACWL/OPACSTD)
    PER GRAMM OF STELLAR MATER (CM**2/GM) PER ANGSTROEM AT DEPTH #IM
@@ -8106,7 +8561,7 @@ void OPMTRX(double WAVE, double *XK, double *XC, double *source_line,
   double opcon[MOSIZE];
   short ion, ITAU;
   int i_cont;
-  int LINE;
+  int LINE, line_iter, use_active_span=0, active_lo=0, active_hi=0;
 
 //  struct rusage r_usage;
 //  time_t t1;
@@ -8115,7 +8570,24 @@ void OPMTRX(double WAVE, double *XK, double *XC, double *source_line,
 
   CONWL5=exp(50.7649141-5.*log(WAVE));
   HNUK=1.43868e8/WAVE;
-  for(LINE=LINE_START; LINE<=LINE_FINISH; LINE++) ALMAX[LINE]=0.;
+  if(active_idx_valid && active_idx!=NULL && n_active_idx>0 &&
+     LINE_START>=0 && LINE_FINISH<NLINES && LINE_START<=LINE_FINISH)
+  {
+    active_lo=ActiveIdxLowerBound(LINE_START);
+    if(LINE_FINISH<NLINES-1) active_hi=ActiveIdxLowerBound(LINE_FINISH+1);
+    else active_hi=n_active_idx;
+    if(active_lo<active_hi) use_active_span=1;
+  }
+
+  if(use_active_span)
+  {
+    for(line_iter=active_lo; line_iter<active_hi; line_iter++)
+      ALMAX[active_idx[line_iter]]=0.;
+  }
+  else
+  {
+    for(LINE=LINE_START; LINE<=LINE_FINISH; LINE++) ALMAX[LINE]=0.;
+  }
 
   CONTOP(WAVE, opcon);
   for(ITAU=0; ITAU<NRHOX; ITAU++)
@@ -8143,8 +8615,11 @@ void OPMTRX(double WAVE, double *XK, double *XC, double *source_line,
 //    if(ITAU==0) printf("START:%d, END:%d\n", LINE_START,LINE_FINISH);
 
     ALINE=0.;
-    for(LINE=LINE_START; LINE<=LINE_FINISH; LINE++)
+    for(line_iter=use_active_span?active_lo:LINE_START;
+        line_iter<(use_active_span?active_hi:LINE_FINISH+1);
+        line_iter++)
     {
+      LINE=use_active_span ? active_idx[line_iter] : line_iter;
       if(MARK[LINE] || WAVE<=Wlim_left[LINE] || WAVE>=Wlim_right[LINE]) continue;
       if(AUTOION[LINE] && (GAMVW[LINE]<=0.0 || GAMQST[LINE]<=0.0)) continue;
       WLC=WLCENT[LINE];
