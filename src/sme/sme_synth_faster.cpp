@@ -6034,14 +6034,21 @@ extern "C" char const * SME_DLL Transf(int n, void *arg[])
 
     for(line=0;line<NLINES;line++)
     {
-      LINEOPAC(line);
       if(use_precomputed_lineinfo)
       {
-        MARK[line]=pre_strong[line]?0:2;
+        int strong = pre_strong[line] ? 1 : 0;
+        MARK[line]=strong ? 0 : 2;
         Wlim_left [line]=pre_range_s[line];
         Wlim_right[line]=pre_range_e[line];
+        if(!strong)
+        {
+          ALMAX[line]=0.;
+          continue;
+        }
       }
-      else if(NWL==0)
+
+      LINEOPAC(line);
+      if(!use_precomputed_lineinfo && NWL==0)
       {
         MARK[line]=(ALMAX[line]<EPS1)?2:-1;
         Wlim_left [line]=max(WLCENT[line]-1000., 0.); /* Initialize line contribution limits */
