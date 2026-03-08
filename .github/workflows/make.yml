@@ -144,16 +144,33 @@ jobs:
       - name: Select GNU compilers (macOS)
         if: matrix.runs_on == 'macos-13' || matrix.runs_on == 'macos-15'
         run: |
+          set -euxo pipefail
           BREW_PREFIX="$(brew --prefix)"
-          # gfortran 通常有无版本号两个名字，取到主版本号以匹配 gcc/g++
-          FVER="$($BREW_PREFIX/bin/gfortran -dumpversion | cut -d. -f1 || echo 14)"
+          ls -1 "$BREW_PREFIX"/bin/gcc* "$BREW_PREFIX"/bin/gfortran* || true
+
+          # Prefer versioned gfortran (e.g., gfortran-14); fallback to unversioned.
+          FVER="$(
+            { ls "$BREW_PREFIX"/bin/gfortran-* 2>/dev/null \
+                | sed -E 's#.*gfortran-##' \
+                | sort -V \
+                | tail -n1; } || true
+          )"
+          if [ -z "${FVER}" ] && [ -x "$BREW_PREFIX/bin/gfortran" ]; then
+            FVER="$("$BREW_PREFIX/bin/gfortran" -dumpversion | cut -d. -f1 || true)"
+          fi
+          [ -n "${FVER}" ] || FVER=14
+
+          [ -x "$BREW_PREFIX/bin/gcc-$FVER" ] || { echo "missing gcc-$FVER"; exit 1; }
+          [ -x "$BREW_PREFIX/bin/g++-$FVER" ] || { echo "missing g++-$FVER"; exit 1; }
+
           echo "CC=$BREW_PREFIX/bin/gcc-$FVER"       >> $GITHUB_ENV
           echo "CXX=$BREW_PREFIX/bin/g++-$FVER"      >> $GITHUB_ENV
-          # gfortran 可能有无版本号，可都尝试
+          # gfortran may be versioned or unversioned
           if [ -x "$BREW_PREFIX/bin/gfortran-$FVER" ]; then
             echo "FC=$BREW_PREFIX/bin/gfortran-$FVER" >> $GITHUB_ENV
             echo "F77=$BREW_PREFIX/bin/gfortran-$FVER" >> $GITHUB_ENV
           else
+            [ -x "$BREW_PREFIX/bin/gfortran" ] || { echo "missing gfortran"; exit 1; }
             echo "FC=$BREW_PREFIX/bin/gfortran" >> $GITHUB_ENV
             echo "F77=$BREW_PREFIX/bin/gfortran" >> $GITHUB_ENV
           fi
