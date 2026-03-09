@@ -6,6 +6,7 @@ permissions:
 on:
   push:
     branches: [master]
+    tags: ["v*"]
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -356,26 +357,15 @@ jobs:
 
   create_release:
     needs: [build, manylinux-build]
-    if: ${{ (github.event_name == 'push' ||
-           (github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.publish || 'false')))
+    if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
          && needs.build.result == 'success'
          && needs['manylinux-build'].result == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      tag: ${{ steps.tag_release.outputs.new_tag }}
+      tag: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
-      - name: GitHub Tag
-        id: tag_release
-        # You may pin to the exact commit or the version.·
-        # uses: mathieudutour/github-tag-action@1bab3ab0712cafa42b54c512453487b89bb06504
-        uses: mathieudutour/github-tag-action@v6.1
-        with:
-          # Required for permission to tag the repo.
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Which type of bump to use when none explicitly provided (default: `patch`).
-          # default_bump: # optional, default is patch
 
       - name: Create Release
         id: create_release
@@ -383,8 +373,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
         with:
-          tag_name: ${{ steps.tag_release.outputs.new_tag }}
-          release_name: Release ${{ steps.tag_release.outputs.new_tag }}
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
 

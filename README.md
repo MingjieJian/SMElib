@@ -18,6 +18,17 @@ spectrum of a star with a model spectrum. Since its initial release in
 ## Download
 You can find compiled versions of the library for Linux and Mac OS under [Releases](https://github.com/MingjieJian/SMElib/releases).
 
+## CI and Release Workflow
+
+- Pull requests to `master` run CI checks only (build and tests).
+- Pushes to `master` run CI checks only (build and tests).
+- Precompiled release artifacts are published only when a tag matching `v*` is pushed (for example, `v6.13.14`).
+
+Recommended release sequence:
+1. Merge tested changes into `master`.
+2. Create a version tag (`v*`) on that release commit.
+3. GitHub Actions will build artifacts and publish them to the corresponding GitHub Release automatically.
+
 <!-- There are two versions for each OS. The gfortran version uses gfortran to compile the Fortran code, while the [F2C](https://www.netlib.org/f2c/) version first converts the Fortran code to C++ code. The difference between these two are that f2c does not require libgfortran, but gives slightly numerical differences. It also appears to run faster in preliminary tests. -->
 Note that depending on your system you might have to install libgfortran as well.
 
